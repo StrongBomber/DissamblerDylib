@@ -6,6 +6,7 @@
 #import "DDCore.h"
 #import "DDHooks.h"
 #import "DDSwizzles.h"
+#import "DDOverride.h"
 #import "DDUI.h"
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
@@ -15,7 +16,14 @@ __attribute__((constructor)) static void ddumper_entry(void) {
     // 1) Dizinler + banner
     [DDCore bootstrap];
 
-    // 2) C seviyesi dosya hook'ları (fishhook) — oyun açılışındaki
+    // 2) Kalıcı canlı düzenlemeleri önbelleğe yükle
+    //    (oyun açılış dosyalarını okumadan ÖNCE aktif olmalı)
+    dispatch_async([DDCore ioQueue], ^{
+      DD_GUARD_CURRENT_BLOCK;
+      [DDOverride reload];
+    });
+
+    // 3) C seviyesi dosya hook'ları (fishhook) — oyun açılışındaki
     //    dosya erişimlerini de yakalamak için mümkün olduğunca erken kurulur.
     DDInstallCHooks();
 

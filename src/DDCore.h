@@ -52,6 +52,7 @@ void DDLogEvent(NSString *kind, NSString * _Nullable path, NSString * _Nullable 
 + (NSString *)dumpsPath;         // <base>/Dumps
 + (NSString *)capturedPath;      // <base>/Captured
 + (NSString *)logsPath;          // <base>/Logs
++ (NSString *)overridesPath;     // <base>/Overrides (canlı düzenleme kopyaları)
 + (NSString *)reportsPath;       // <base>/Reports (tek dump sırasında oluşur)
 
 #pragma mark Settings (NSUserDefaults)
@@ -60,6 +61,8 @@ void DDLogEvent(NSString *kind, NSString * _Nullable path, NSString * _Nullable 
 + (BOOL)fileLogging;        + (void)setFileLogging:(BOOL)v;   // erişim günlüğü
 + (BOOL)verboseLog;         + (void)setVerboseLog:(BOOL)v;    // sistem dosyaları dahil
 + (BOOL)zipAfterDump;       + (void)setZipAfterDump:(BOOL)v;  // dump sonrası ZIP üret
++ (BOOL)netLogging;         + (void)setNetLogging:(BOOL)v;    // connect() ağ olaylarını logla
++ (BOOL)ipaBuild;           + (void)setIpaBuild:(BOOL)v;      // akıllı dump'ta decrypted IPA üret
 
 #pragma mark Log ring & observers
 + (NSArray<NSString *> *)snapshotLines;

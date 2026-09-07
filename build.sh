@@ -35,7 +35,7 @@ xcrun -sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" \
   -std=gnu++17 -fobjc-arc -O2 \
   -Wall -Wno-unused-parameter -Wno-deprecated-declarations \
   -framework Foundation -framework UIKit -framework CoreGraphics \
-  -lz \
+  -lz -lsqlite3 \
   -dynamiclib \
   -install_name "@rpath/$DYLIB_NAME" \
   src/DDCore.mm \
@@ -44,6 +44,16 @@ xcrun -sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" \
   src/DDImageDumper.mm \
   src/DDZipWriter.mm \
   src/DDDumpService.mm \
+  src/DDUICommon.mm \
+  src/DDOverride.mm \
+  src/DDExEditor.mm \
+  src/DDExAnalyzer.mm \
+  src/DDExDB.mm \
+  src/DDExClasses.mm \
+  src/DDExMemory.mm \
+  src/DDExSearch.mm \
+  src/DDExDefaults.mm \
+  src/DDSmartDump.mm \
   src/DDUI.mm \
   src/DDEntry.mm \
   "$OUT/fishhook.o" \

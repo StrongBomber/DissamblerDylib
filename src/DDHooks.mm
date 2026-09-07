@@ -10,8 +10,10 @@
 
 #import "DDHooks.h"
 #import "DDCore.h"
+#import "DDOverride.h"
 #import "fishhook.h"
 
+#import <arpa/inet.h>
 #import <dlfcn.h>
 #import <dirent.h>
 #import <fcntl.h>
@@ -19,12 +21,16 @@
 #import <stdarg.h>
 #import <string.h>
 #import <strings.h>
+#import <sys/socket.h>
 #import <sys/stat.h>
 #import <unistd.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX 1024
 #endif
+
+// DDOverride.mm içinde tanımlı hızlı C arayüzü
+BOOL DDOverrideResolveC(const char *path, char *out, size_t outsz);
 
 #pragma mark - Orijinal fonksiyon işaretçileri
 
@@ -42,6 +48,19 @@ static int   (*orig_rename)(const char *, const char *);
 static int   (*orig_mkdir)(const char *, mode_t);
 static int   (*orig_sqlite3_open)(const char *, void **);
 static int   (*orig_sqlite3_open_v2)(const char *, void **, int, const char *);
+static int   (*orig_connect)(int, const struct sockaddr *, socklen_t);
+
+#pragma mark - Canlı düzenleme (override) yönlendirmesi
+
+/// Yalnız OKUMA işlemleri yönlendirilir: oyunun yazmaları orijinale gider.
+/// Kendi IO'larımız (guard / io kuyruğu) asla yönlendirilmez.
+static const char *dd_redirect_read(const char *path, char *buf, size_t bufsz) {
+  if (!path || path[0] != '/') return path;
+  if (DDThreadGuardActive() || DDOnOurIOQueue()) return path;
+  if (dd_c_home_len == 0 || strncmp(path, dd_c_home, dd_c_home_len) != 0) return path;
+  if (DDOverrideResolveC(path, buf, bufsz)) return buf;
+  return path;
+}
 
 #pragma mark - Hızlı yol önek kontrolleri (C düzeyinde)
 
@@ -115,13 +134,20 @@ static int dd_open(const char *path, int oflag, ...) {
     va_end(ap);
   }
   bool ro = ((oflag & O_ACCMODE) == O_RDONLY);
-  char extra[96];
-  snprintf(extra, sizeof(extra), "%s%s",
+
+  const char *eff = path;
+  char redir[PATH_MAX];
+  if (ro) eff = dd_redirect_read(path, redir, sizeof(redir));
+
+  char extra[128];
+  snprintf(extra, sizeof(extra), "%s%s%s",
            ro ? "r" : "rw",
-           (oflag & O_CREAT) ? " +O_CREAT" : "");
+           (oflag & O_CREAT) ? " +O_CREAT" : "",
+           (eff != path) ? " ✏️OVERRIDE" : "");
   dd_record("OPEN", path, extra, ro);
-  if (oflag & O_CREAT) return orig_open(path, oflag, mode);
-  return orig_open(path, oflag);
+
+  if (oflag & O_CREAT) return orig_open(eff, oflag, mode);
+  return orig_open(eff, oflag);
 }
 
 static int dd_openat(int dirfd, const char *path, int oflag, ...) {
@@ -132,11 +158,6 @@ static int dd_openat(int dirfd, const char *path, int oflag, ...) {
     mode = (mode_t)va_arg(ap, int);
     va_end(ap);
   }
-  bool ro = ((oflag & O_ACCMODE) == O_RDONLY);
-  char extra[32];
-  snprintf(extra, sizeof(extra), "%s%s", ro ? "r" : "rw",
-           (oflag & O_CREAT) ? " +O_CREAT" : "");
-
   // Tam yolu çöz (göreli path + dirfd)
   char full[PATH_MAX + 64];
   if (path && path[0] != '/') {
@@ -147,15 +168,37 @@ static int dd_openat(int dirfd, const char *path, int oflag, ...) {
   } else {
     snprintf(full, sizeof(full), "%s", path ? path : "");
   }
+
+  const char *eff = full;
+  char redir[PATH_MAX + 64];
+  if (ro) eff = dd_redirect_read(full, redir, sizeof(redir));
+
+  char extra[128];
+  snprintf(extra, sizeof(extra), "%s%s", ro ? "r" : "rw",
+           (eff != full) ? " ✏️OVERRIDE" : "");
   dd_record("OPEN", full, extra, ro);
+
+  // orig_openat göreli path ister; yönlendirme tam yol gerektirir → open kullan
+  if (eff != full && eff[0] == '/') {
+    if (oflag & O_CREAT) return orig_open(eff, oflag, mode);
+    return orig_open(eff, oflag);
+  }
   if (oflag & O_CREAT) return orig_openat(dirfd, path, oflag, mode);
   return orig_openat(dirfd, path, oflag);
 }
 
 static FILE *dd_fopen(const char *path, const char *mode) {
   bool ro = (mode && strchr(mode, 'r') && !strchr(mode, 'w') && !strchr(mode, 'a') && !strchr(mode, '+'));
-  dd_record("FOPEN", path, mode, ro);
-  return orig_fopen(path, mode);
+
+  const char *eff = path;
+  char redir[PATH_MAX];
+  if (ro) eff = dd_redirect_read(path, redir, sizeof(redir));
+
+  char extra[128];
+  snprintf(extra, sizeof(extra), "%s%s", mode ?: "",
+           (eff != path) ? " ✏️OVERRIDE" : "");
+  dd_record("FOPEN", path, extra, ro);
+  return orig_fopen(eff, mode);
 }
 
 static void *dd_dlopen(const char *path, int mode) {
@@ -170,12 +213,18 @@ static int dd_dlopen_preflight(const char *path, int mode) {
 
 static int dd_stat(const char *path, struct stat *st) {
   if ([DDCore verboseLog]) dd_record("STAT", path, NULL, false);
-  return orig_stat(path, st);
+  const char *eff = path;
+  char redir[PATH_MAX];
+  eff = dd_redirect_read(path, redir, sizeof(redir)); // boyut tutarlılığı için
+  return orig_stat(eff, st);
 }
 
 static int dd_lstat(const char *path, struct stat *st) {
   if ([DDCore verboseLog]) dd_record("LSTAT", path, NULL, false);
-  return orig_lstat(path, st);
+  const char *eff = path;
+  char redir[PATH_MAX];
+  eff = dd_redirect_read(path, redir, sizeof(redir));
+  return orig_lstat(eff, st);
 }
 
 static int dd_access(const char *path, int mode) {
@@ -206,14 +255,52 @@ static int dd_mkdir(const char *path, mode_t mode) {
 }
 
 static int dd_sqlite3_open(const char *path, void **db) {
-  dd_record("SQLITE", path, NULL, true);
+  // sqlite3_open varsayılan RW açar → yönlendirme YOK (kaydedilen veri bozulmasın)
+  dd_record("SQLITE", path, NULL, false);
   return orig_sqlite3_open(path, db);
 }
 
 static int dd_sqlite3_open_v2(const char *path, void **db, int flags, const char *vfs) {
   bool ro = (flags & 0x00000001) != 0; // SQLITE_OPEN_READONLY
-  dd_record("SQLITE", path, ro ? "ro" : "rw", ro);
-  return orig_sqlite3_open_v2(path, db, flags, vfs);
+  const char *eff = path;
+  char redir[PATH_MAX];
+  if (ro) eff = dd_redirect_read(path, redir, sizeof(redir));
+  char extra[64];
+  snprintf(extra, sizeof(extra), "%s%s", ro ? "ro" : "rw",
+           (eff != path) ? " ✏️OVERRIDE" : "");
+  dd_record("SQLITE", path, extra, ro);
+  return orig_sqlite3_open_v2(eff, db, flags, vfs);
+}
+
+static int dd_connect(int s, const struct sockaddr *name, socklen_t namelen) {
+  if ([DDCore netLogging] && name && !DDThreadGuardActive() && !DDOnOurIOQueue()) {
+    char dst[128];
+    dst[0] = '\0';
+    if (name->sa_family == AF_INET && namelen >= sizeof(struct sockaddr_in)) {
+      const struct sockaddr_in *a = (const struct sockaddr_in *)name;
+      char ip[INET_ADDRSTRLEN];
+      if (inet_ntop(AF_INET, &a->sin_addr, ip, sizeof(ip))) {
+        snprintf(dst, sizeof(dst), "%s:%u", ip, (unsigned)ntohs(a->sin_port));
+      }
+    } else if (name->sa_family == AF_INET6 && namelen >= sizeof(struct sockaddr_in6)) {
+      const struct sockaddr_in6 *a6 = (const struct sockaddr_in6 *)name;
+      char ip[INET6_ADDRSTRLEN];
+      if (inet_ntop(AF_INET6, &a6->sin6_addr, ip, sizeof(ip))) {
+        snprintf(dst, sizeof(dst), "[%s]:%u", ip, (unsigned)ntohs(a6->sin6_port));
+      }
+    }
+    if (dst[0]) {
+      dispatch_async([DDCore ioQueue], ^{
+        DD_GUARD_CURRENT_BLOCK;
+        [DDCore noteAccess:[NSString stringWithFormat:@"🌐 %@", [NSString stringWithUTF8String:dst]]
+                       kind:@"NET"];
+        if ([DDCore fileLogging]) {
+          DDLogEvent(@"NET", [NSString stringWithUTF8String:dst], nil);
+        }
+      });
+    }
+  }
+  return orig_connect(s, name, namelen);
 }
 
 #pragma mark - Kurulum
@@ -236,6 +323,7 @@ void DDInstallCHooks(void) {
     {"mkdir",             (void *)dd_mkdir,             (void **)&orig_mkdir},
     {"sqlite3_open",      (void *)dd_sqlite3_open,      (void **)&orig_sqlite3_open},
     {"sqlite3_open_v2",   (void *)dd_sqlite3_open_v2,   (void **)&orig_sqlite3_open_v2},
+    {"connect",           (void *)dd_connect,           (void **)&orig_connect},
   };
   size_t n = sizeof(rebs) / sizeof(rebs[0]);
   int rc = rebind_symbols(rebs, n);

@@ -282,6 +282,7 @@ void DDLogEvent(NSString *kind, NSString *path, NSString *extra) {
 + (NSString *)dumpsPath   { return [[DDCore basePath] stringByAppendingPathComponent:@"Dumps"]; }
 + (NSString *)capturedPath{ return [[DDCore basePath] stringByAppendingPathComponent:@"Captured"]; }
 + (NSString *)logsPath    { return [[DDCore basePath] stringByAppendingPathComponent:@"Logs"]; }
++ (NSString *)overridesPath { return [[DDCore basePath] stringByAppendingPathComponent:@"Overrides"]; }
 + (NSString *)reportsPath { return [[DDCore basePath] stringByAppendingPathComponent:@"Reports"]; }
 
 #pragma mark - Settings
@@ -299,6 +300,8 @@ void DDLogEvent(NSString *kind, NSString *path, NSString *extra) {
 + (BOOL)fileLogging     { return [DDCore boolSetting:@"dd.filelog" default:YES]; }
 + (BOOL)verboseLog      { return [DDCore boolSetting:@"dd.verbose" default:NO]; }
 + (BOOL)zipAfterDump    { return [DDCore boolSetting:@"dd.makezip" default:YES]; }
++ (BOOL)netLogging      { return [DDCore boolSetting:@"dd.netlog" default:YES]; }
++ (BOOL)ipaBuild        { return [DDCore boolSetting:@"dd.ipabuild" default:YES]; }
 
 + (void)setBoolSetting:(NSString *)key value:(BOOL)v {
   [[NSUserDefaults standardUserDefaults] setBool:v forKey:key];
@@ -309,6 +312,8 @@ void DDLogEvent(NSString *kind, NSString *path, NSString *extra) {
 + (void)setFileLogging:(BOOL)v   { [DDCore setBoolSetting:@"dd.filelog" value:v]; }
 + (void)setVerboseLog:(BOOL)v    { [DDCore setBoolSetting:@"dd.verbose" value:v]; }
 + (void)setZipAfterDump:(BOOL)v  { [DDCore setBoolSetting:@"dd.makezip" value:v]; }
++ (void)setNetLogging:(BOOL)v    { [DDCore setBoolSetting:@"dd.netlog" value:v]; }
++ (void)setIpaBuild:(BOOL)v      { [DDCore setBoolSetting:@"dd.ipabuild" value:v]; }
 
 #pragma mark - Erişim istatistikleri
 
@@ -525,7 +530,8 @@ static NSMutableDictionary<NSString *, NSMutableDictionary *> *dd_stats = nil;
   DD_GUARD_CURRENT_BLOCK;
   NSFileManager *fm = [[NSFileManager alloc] init];
   for (NSString *dir in @[[DDCore basePath], [DDCore dumpsPath],
-                          [DDCore capturedPath], [DDCore logsPath]]) {
+                          [DDCore capturedPath], [DDCore logsPath],
+                          [DDCore overridesPath]]) {
     [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
   }
   DDLog(@"════════════════════════════════════════════");

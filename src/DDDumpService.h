@@ -33,6 +33,10 @@ typedef void (^DDZipCompletion)(NSString * _Nullable zipPath, NSError * _Nullabl
 /// Uygulama paketini (bundle) bir hedef klasöre kopyalar.
 + (BOOL)copyBundleToDirectory:(NSString *)dir error:(NSError **)error;
 
+/// Raporları (bilgi, erişim istatistikleri, yüklü görüntüler, Info.plist)
+/// <dir>/Reports altına yazar. Smart dump da kullanır.
++ (void)writeReportsToDirectory:(NSString *)dir;
+
 @end
 
 NS_ASSUME_NONNULL_END

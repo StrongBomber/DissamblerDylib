@@ -8,8 +8,18 @@
 
 #import "DDSwizzles.h"
 #import "DDCore.h"
+#import "DDOverride.h"
 #import <objc/runtime.h>
 #import <UIKit/UIKit.h>
+
+#pragma mark - Okuma yönlendirme (canlı düzenleme)
+
+/// Oyunun OKUMA yöntemlerine verilen yolu override kopyasına çevirir.
+static NSString *dd_eff_read_path(NSString *path) {
+  if (path.length == 0) return path;
+  if (DDThreadGuardActive() || DDOnOurIOQueue()) return path;
+  return [DDOverride effectivePathFor:path] ?: path;
+}
 
 #pragma mark - Swizzle yardımcıları
 
@@ -53,7 +63,7 @@ typedef NSData *(*NSDataReadFn)(id, SEL, NSString *);
 static NSDataReadFn orig_dataWithContentsOfFile;
 static NSData *dd_dataWithContentsOfFile(id self, SEL _cmd, NSString *path) {
   dd_note_read(path, @"OBJC", YES);
-  return orig_dataWithContentsOfFile(self, _cmd, path);
+  return orig_dataWithContentsOfFile(self, _cmd, dd_eff_read_path(path));
 }
 
 typedef NSData *(*NSDataReadOptFn)(id, SEL, NSString *, NSUInteger, NSError **);
@@ -61,7 +71,7 @@ static NSDataReadOptFn orig_dataWithContentsOfFileOpt;
 static NSData *dd_dataWithContentsOfFileOpt(id self, SEL _cmd, NSString *path,
                                              NSUInteger opt, NSError **err) {
   dd_note_read(path, @"OBJC", YES);
-  return orig_dataWithContentsOfFileOpt(self, _cmd, path, opt, err);
+  return orig_dataWithContentsOfFileOpt(self, _cmd, dd_eff_read_path(path), opt, err);
 }
 
 #pragma mark - NSString
@@ -71,7 +81,7 @@ static NSStringReadEncFn orig_stringWithContentsOfFileEnc;
 static NSString *dd_stringWithContentsOfFileEnc(id self, SEL _cmd, NSString *path,
                                                  NSStringEncoding enc, NSError **err) {
   dd_note_read(path, @"OBJC", YES);
-  return orig_stringWithContentsOfFileEnc(self, _cmd, path, enc, err);
+  return orig_stringWithContentsOfFileEnc(self, _cmd, dd_eff_read_path(path), enc, err);
 }
 
 typedef NSString *(*NSStringReadUsedFn)(id, SEL, NSString *, NSStringEncoding *, NSError **);
@@ -79,7 +89,7 @@ static NSStringReadUsedFn orig_stringWithContentsOfFileUsed;
 static NSString *dd_stringWithContentsOfFileUsed(id self, SEL _cmd, NSString *path,
                                                   NSStringEncoding *used, NSError **err) {
   dd_note_read(path, @"OBJC", YES);
-  return orig_stringWithContentsOfFileUsed(self, _cmd, path, used, err);
+  return orig_stringWithContentsOfFileUsed(self, _cmd, dd_eff_read_path(path), used, err);
 }
 
 #pragma mark - NSArray / NSDictionary / NSMutableArray... plist okumaları
@@ -88,13 +98,13 @@ typedef id (*PlistReadFn)(id, SEL, NSString *);
 static PlistReadFn orig_arrayWithContentsOfFile;
 static id dd_arrayWithContentsOfFile(id self, SEL _cmd, NSString *path) {
   dd_note_read(path, @"OBJC", YES);
-  return orig_arrayWithContentsOfFile(self, _cmd, path);
+  return orig_arrayWithContentsOfFile(self, _cmd, dd_eff_read_path(path));
 }
 
 static PlistReadFn orig_dictionaryWithContentsOfFile;
 static id dd_dictionaryWithContentsOfFile(id self, SEL _cmd, NSString *path) {
   dd_note_read(path, @"OBJC", YES);
-  return orig_dictionaryWithContentsOfFile(self, _cmd, path);
+  return orig_dictionaryWithContentsOfFile(self, _cmd, dd_eff_read_path(path));
 }
 
 #pragma mark - UIImage
@@ -103,7 +113,7 @@ typedef UIImage *(*UIImageFileFn)(id, SEL, NSString *);
 static UIImageFileFn orig_imageWithContentsOfFile;
 static UIImage *dd_imageWithContentsOfFile(id self, SEL _cmd, NSString *path) {
   dd_note_read(path, @"TEXTURE", YES);
-  return orig_imageWithContentsOfFile(self, _cmd, path);
+  return orig_imageWithContentsOfFile(self, _cmd, dd_eff_read_path(path));
 }
 
 typedef UIImage *(*UIImageNameFn)(id, SEL, NSString *);
@@ -121,7 +131,11 @@ typedef NSString *(*BundlePathFn)(id, SEL, NSString *, NSString *);
 static BundlePathFn orig_pathForResource;
 static NSString *dd_pathForResource(id self, SEL _cmd, NSString *name, NSString *ext) {
   NSString *r = orig_pathForResource(self, _cmd, name, ext);
-  if (r.length > 0) dd_note_read(r, @"BUNDLE", YES);
+  if (r.length > 0) {
+    dd_note_read(r, @"BUNDLE", YES);
+    NSString *ov = [DDOverride effectivePathFor:r];
+    if (ov) return ov;  // canlı düzenleme: oyun override kopyasını okusun
+  }
   return r;
 }
 
@@ -130,7 +144,11 @@ static BundlePathDirFn orig_pathForResourceInDir;
 static NSString *dd_pathForResourceInDir(id self, SEL _cmd, NSString *name, NSString *ext,
                                           NSString *dir) {
   NSString *r = orig_pathForResourceInDir(self, _cmd, name, ext, dir);
-  if (r.length > 0) dd_note_read(r, @"BUNDLE", YES);
+  if (r.length > 0) {
+    dd_note_read(r, @"BUNDLE", YES);
+    NSString *ov = [DDOverride effectivePathFor:r];
+    if (ov) return ov;
+  }
   return r;
 }
 
