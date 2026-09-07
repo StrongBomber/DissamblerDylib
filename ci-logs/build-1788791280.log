@@ -1,0 +1,96 @@
+SDK: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk
+→ fishhook derleniyor (C)…
+→ DDumper derleniyor (Objective-C++)…
+src/DDCore.mm:69:5: error: use of undeclared identifier 'dispatch_set_specific'; did you mean 'dispatch_queue_set_specific'?
+    dispatch_set_specific(q, dd_io_queue_key, (void *)dd_io_queue_marker, 0);
+    ^~~~~~~~~~~~~~~~~~~~~
+    dispatch_queue_set_specific
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/usr/include/dispatch/queue.h:1562:1: note: 'dispatch_queue_set_specific' declared here
+dispatch_queue_set_specific(dispatch_queue_t queue, const void *key,
+^
+src/DDCore.mm:424:26: error: property 'isDirectory' not found on object of type 'NSString *'
+    if (a && !a.fileType.isDirectory) count++;
+                         ^
+2 errors generated.
+src/DDHooks.mm:82:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDHooks.mm:89:15: error: no known class method for selector 'captureNowIfNeeded:'
+      [DDCore captureNowIfNeeded:p];
+              ^~~~~~~~~~~~~~~~~~
+2 errors generated.
+src/DDSwizzles.mm:42:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDSwizzles.mm:46:26: error: no known class method for selector 'captureNowIfNeeded:'
+    if (capture) [DDCore captureNowIfNeeded:p];
+                         ^~~~~~~~~~~~~~~~~~
+2 errors generated.
+In file included from src/DDImageDumper.mm:22:
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/usr/include/mach/mach_vm.h:1:2: error: mach_vm.h unsupported.
+#error mach_vm.h unsupported.
+ ^
+src/DDImageDumper.mm:285:24: error: use of undeclared identifier 'mach_vm_read'
+    kern_return_t kr = mach_vm_read(mach_task_self(), addr, crypt.cryptsize, &buf, &bufCnt);
+                       ^
+2 errors generated.
+src/DDZipWriter.mm:16:17: warning: unused function 'dd_crc32_buffered' [-Wunused-function]
+static uint32_t dd_crc32_buffered(NSFileHandle *h, uint64_t size, uint32_t *outCrc);
+                ^
+1 warning generated.
+src/DDDumpService.mm:112:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDDumpService.mm:142:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+2 errors generated.
+src/DDUI.mm:33:55: error: property 'window' not found on object of type 'DDOverlayController *'
+  UIViewController *vc = [DDOverlayController shared].window.rootViewController;
+                                                      ^
+src/DDUI.mm:62:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDUI.mm:168:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDUI.mm:199:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDUI.mm:477:1: error: duplicate declaration of method 'tableView:accessoryButtonTappedForRowWithIndexPath:'
+- (void)tableView:(UITableView *)tableView
+^
+src/DDUI.mm:441:1: note: previous declaration is here
+- (void)tableView:(UITableView *)tableView
+^
+src/DDUI.mm:348:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDUI.mm:430:57: error: expected ')'
+                        handler:^(UIContextualAction *_ action, UIView *_ view,
+                                                        ^
+src/DDUI.mm:430:34: note: to match this '('
+                        handler:^(UIContextualAction *_ action, UIView *_ view,
+                                 ^
+src/DDUI.mm:433:27: error: use of undeclared identifier 'completion'
+                          completion(YES);
+                          ^
+src/DDUI.mm:430:33: error: cannot initialize a parameter of type 'UIContextualActionHandler _Nonnull' (aka 'void (^)(UIContextualAction * _Nonnull __strong, __kindof UIView * _Nonnull __strong, void (^ _Nonnull __strong)(BOOL))') with an rvalue of type 'void (^)(UIContextualAction *__strong)'
+                        handler:^(UIContextualAction *_ action, UIView *_ view,
+                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIContextualAction.h:29:142: note: passing argument to parameter 'handler' here
++ (instancetype)contextualActionWithStyle:(UIContextualActionStyle)style title:(nullable NSString *)title handler:(UIContextualActionHandler)handler;
+                                                                                                                                             ^
+src/DDUI.mm:659:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDUI.mm:715:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDUI.mm:741:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+src/DDUI.mm:1026:26: error: no known class method for selector 'ioQueue'
+  dispatch_async([DDCore ioQueue], ^{
+                         ^~~~~~~
+13 errors generated.
