@@ -34,7 +34,7 @@ xcrun -sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" \
   -miphoneos-version-min="$MIN_IOS" \
   -std=gnu++17 -fobjc-arc -O2 \
   -Wall -Wno-unused-parameter -Wno-deprecated-declarations \
-  -framework Foundation -framework UIKit -framework CoreGraphics \
+  -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore \
   -lz -lsqlite3 \
   -dynamiclib \
   -install_name "@rpath/$DYLIB_NAME" \
