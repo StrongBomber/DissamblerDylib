@@ -17,6 +17,9 @@
 #import <atomic>
 #import <dlfcn.h>
 #import <mach/mach.h>
+
+// (dosyanın sonundaki iptal bölümünde tanımlı)
+static BOOL DDMemScanCancelled(void);
 #import <mach-o/dyld.h>
 #import <string.h>
 
