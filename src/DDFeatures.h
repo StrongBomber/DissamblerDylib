@@ -9,7 +9,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - Önizleme (DDUI.mm içinde, ortak kullanım için burada bildirilir)
 
-@interface DDPreviewVC : UIViewController
+@interface DDPreviewVC : UIViewController <UIScrollViewDelegate>
+@property (nonatomic, copy) NSString *filePath;
+@property (nonatomic, copy, nullable) NSString *effectivePath; // override aktifse oyunun gördüğü
+@property (nonatomic, strong, nullable) UIScrollView *zoomScroll;
+@property (nonatomic, strong, nullable) UIImageView *zoomImage;
 - (instancetype)initWithFile:(NSString *)path;
 @end
 

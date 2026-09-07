@@ -90,7 +90,7 @@
   static NSString *cid = @"defrow";
   UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cid];
   if (!cell) {
-    cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue2 reuseIdentifier:id];
+    cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue2 reuseIdentifier:cid];
     cell.textLabel.font = DDMonoFont(11);
     cell.textLabel.adjustsFontSizeToFitWidth = YES;
     cell.detailTextLabel.font = DDMonoFont(11);

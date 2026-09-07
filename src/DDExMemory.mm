@@ -310,9 +310,10 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
 
 - (void)beginScan:(BOOL)refine {
   if (self.scanning) return;
-  uint8_t pat[8];
   NSUInteger patSize = DDMemTypeSize(self.type);
-  if (!DDMemParseValue(self.valueField.text, self.type, pat)) {
+  uint8_t *pat = (uint8_t *)malloc(patSize);
+  if (!pat || !DDMemParseValue(self.valueField.text, self.type, pat)) {
+    free(pat);
     DDAlert(@"Değer", @"Geçerli bir sayı girin.");
     return;
   }
@@ -337,6 +338,7 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
           if (result.count >= 20000) break;
         }
       }
+      free(pat);
       dispatch_async(dispatch_get_main_queue(), ^{
         [self finishScan:result scanned:self.addresses.count total:totalBytes];
       });
@@ -349,6 +351,7 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
       foundCount = found;
     });
     result = [found mutableCopy];
+    free(pat);
     dispatch_async(dispatch_get_main_queue(), ^{
       [self finishScan:result scanned:totalBytes total:totalBytes];
     });

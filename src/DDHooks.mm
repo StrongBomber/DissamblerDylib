@@ -50,18 +50,6 @@ static int   (*orig_sqlite3_open)(const char *, void **);
 static int   (*orig_sqlite3_open_v2)(const char *, void **, int, const char *);
 static int   (*orig_connect)(int, const struct sockaddr *, socklen_t);
 
-#pragma mark - Canlı düzenleme (override) yönlendirmesi
-
-/// Yalnız OKUMA işlemleri yönlendirilir: oyunun yazmaları orijinale gider.
-/// Kendi IO'larımız (guard / io kuyruğu) asla yönlendirilmez.
-static const char *dd_redirect_read(const char *path, char *buf, size_t bufsz) {
-  if (!path || path[0] != '/') return path;
-  if (DDThreadGuardActive() || DDOnOurIOQueue()) return path;
-  if (dd_c_home_len == 0 || strncmp(path, dd_c_home, dd_c_home_len) != 0) return path;
-  if (DDOverrideResolveC(path, buf, bufsz)) return buf;
-  return path;
-}
-
 #pragma mark - Hızlı yol önek kontrolleri (C düzeyinde)
 
 static char dd_c_home[PATH_MAX];
@@ -84,6 +72,18 @@ static bool dd_should_record(const char *path) {
   if (dd_c_bundle_len > 0 && strncmp(path, dd_c_bundle, dd_c_bundle_len) == 0) return true;
   // /System, /usr, /Developer... yalnız verbose modda
   return [DDCore verboseLog];
+}
+
+#pragma mark - Canlı düzenleme (override) yönlendirmesi
+
+/// Yalnız OKUMA işlemleri yönlendirilir: oyunun yazmaları orijinale gider.
+/// Kendi IO'larımız (guard / io kuyruğu) asla yönlendirilmez.
+static const char *dd_redirect_read(const char *path, char *buf, size_t bufsz) {
+  if (!path || path[0] != '/') return path;
+  if (DDThreadGuardActive() || DDOnOurIOQueue()) return path;
+  if (dd_c_home_len == 0 || strncmp(path, dd_c_home, dd_c_home_len) != 0) return path;
+  if (DDOverrideResolveC(path, buf, bufsz)) return buf;
+  return path;
 }
 
 #pragma mark - Olay kaydı

@@ -34,13 +34,6 @@
 
 #pragma mark - DDPreviewVC
 
-@interface DDPreviewVC : UIViewController <UIScrollViewDelegate>
-@property (nonatomic, copy) NSString *filePath;
-@property (nonatomic, copy, nullable) NSString *effectivePath; // override aktifse oyunun gördüğü
-@property (nonatomic, strong, nullable) UIScrollView *zoomScroll;
-@property (nonatomic, strong, nullable) UIImageView *zoomImage;
-@end
-
 @implementation DDPreviewVC
 
 - (instancetype)initWithFile:(NSString *)path {
