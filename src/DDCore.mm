@@ -66,7 +66,7 @@ static NSDateFormatter *dd_filename_formatter(void) {
   static dispatch_once_t once;
   dispatch_once(&once, ^{
     q = dispatch_queue_create("ddumper.io", DISPATCH_QUEUE_SERIAL);
-    dispatch_set_specific(q, dd_io_queue_key, (void *)dd_io_queue_marker, 0);
+    dispatch_queue_set_specific(q, dd_io_queue_key, (void *)dd_io_queue_marker, NULL);
   });
   return q;
 }
@@ -421,7 +421,7 @@ static NSMutableDictionary<NSString *, NSMutableDictionary *> *dd_stats = nil;
   NSString *f;
   while ((f = [e nextObject])) {
     NSDictionary *a = [e fileAttributes];
-    if (a && !a.fileType.isDirectory) count++;
+    if (a && ![a.fileType isEqualToString:NSFileTypeDirectory]) count++;
   }
   return count;
 }

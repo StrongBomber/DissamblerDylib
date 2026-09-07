@@ -12,6 +12,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)shared;
 
+/// Overlay'in sahibi olduğu en üst seviye pencere (menü/paylaşım sunumları için).
+@property (nonatomic, readonly, nullable) UIWindow *window;
+
 /// Uygulama launch olduktan sonra çağrılır (gecikmeli).
 - (void)showAfterLaunch;
 

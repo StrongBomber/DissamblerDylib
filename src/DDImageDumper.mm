@@ -19,15 +19,18 @@
 #import <mach-o/dyld.h>
 #import <mach-o/fat.h>
 #import <mach/mach.h>
-#import <mach/mach_vm.h>
 #import <string.h>
-#import <sys/param.h>
 #import <stdlib.h>
 #import <unistd.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX 1024
 #endif
+
+// iPhoneOS SDK'daki <mach/mach_vm.h> bir stub olduğu için (dumpdecrypted'deki gibi)
+// mach_vm_read bildirimini elle yapıyoruz. ABI: (map, u64, u64, vm_offset_t*, u32*)
+extern "C" kern_return_t mach_vm_read(vm_map_t target_task, uint64_t address, uint64_t size,
+                                      vm_offset_t *data, mach_msg_type_number_t *data_cnt);
 
 #pragma mark - Mach-O parse yardımcıları
 

@@ -13,7 +13,6 @@
 #import <zlib.h>
 
 static uint32_t dd_dos_date(NSDate *date);
-static uint32_t dd_crc32_buffered(NSFileHandle *h, uint64_t size, uint32_t *outCrc);
 
 #pragma mark - Yardımcılar
 

@@ -74,9 +74,14 @@ void DDLogEvent(NSString *kind, NSString * _Nullable path, NSString * _Nullable 
 + (void)noteAccess:(NSString *)path kind:(NSString *)kind;
 + (NSDictionary<NSString *, NSDictionary<NSString *, id> *> *)accessStats;
 
+#pragma mark - io kuyruğu (tüm ağırlık işleri burada, guard'lı çalışır)
++ (dispatch_queue_t)ioQueue;
+
 #pragma mark Yakalama (auto-capture)
 /// path bir oyundosyasıysa (bundle / sandbox) Captured altına kopyalar (io kuyruğunda, async).
 + (void)maybeCapturePath:(NSString *)path;
+/// io kuyruğunda/guard altında senkron yakalama (hook kayıtlarından çağrılır).
++ (void)captureNowIfNeeded:(NSString *)path;
 + (NSUInteger)capturedFileCount;
 + (void)clearCaptured;
 + (void)clearAllData;

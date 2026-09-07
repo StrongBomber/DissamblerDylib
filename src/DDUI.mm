@@ -427,20 +427,15 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   UIContextualAction *share = [UIContextualAction
       contextualActionWithStyle:UIContextualActionStyleNormal
                           title:e.isDir ? @"ZIP+📤" : @"📤"
-                        handler:^(UIContextualAction *_ action, UIView *_ view,
-                                  void (^completion)(BOOL)) {
+                        handler:^(UIContextualAction *action, UIView *view,
+                                  void (^completionHandler)(BOOL)) {
                           [ws shareEntry:e];
-                          completion(YES);
+                          completionHandler(YES);
                         }];
   share.backgroundColor = [UIColor colorWithRed:0.0 green:0.45 blue:0.9 alpha:1.0];
   UISwipeActionsConfiguration *cfg =
       [UISwipeActionsConfiguration configurationWithActions:@[share]];
   return cfg;
-}
-
-- (void)tableView:(UITableView *)tableView
-    accessoryButtonTappedForRowWithIndexPath:(NSIndexPath *)indexPath {
-  [self longPress:indexPath];
 }
 
 - (void)tableLongPressed:(UILongPressGestureRecognizer *)g {
@@ -472,11 +467,6 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 
 - (void)shareCurrentFolder {
   [self zipAndShare:self.currentPath];
-}
-
-- (void)tableView:(UITableView *)tableView
-    accessoryButtonTappedForRowWithIndexPath:(NSIndexPath *)indexPath {
-  [self longPress:indexPath];
 }
 
 - (void)longPress:(NSIndexPath *)indexPath {
@@ -1071,7 +1061,7 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 #pragma mark - DDOverlayController
 
 @interface DDOverlayController ()
-@property (nonatomic, strong) UIWindow *window;
+@property (nonatomic, strong, readwrite) UIWindow *window;
 @property (nonatomic, strong) UIButton *button;
 @end
 
