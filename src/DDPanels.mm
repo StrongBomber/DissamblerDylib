@@ -370,6 +370,15 @@ void DDResultPanel(NSString *title, NSString *path) {
     [shareBtn.heightAnchor constraintEqualToConstant:46].active = YES;
     [stack addArrangedSubview:shareBtn];
 
+    UIButton *saveBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [saveBtn setTitle:@"📁  Dosyalar uygulamasına kaydet" forState:UIControlStateNormal];
+    [saveBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    saveBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    saveBtn.backgroundColor = [UIColor colorWithRed:0.13 green:0.16 blue:0.22 alpha:1.0];
+    saveBtn.layer.cornerRadius = 12;
+    [saveBtn.heightAnchor constraintEqualToConstant:44].active = YES;
+    [stack addArrangedSubview:saveBtn];
+
     UIButton *openBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     [openBtn setTitle:@"📂  İçindekileri Aç (tarayıcı)" forState:UIControlStateNormal];
     [openBtn setTitleColor:DDPanelAccent() forState:UIControlStateNormal];
@@ -401,6 +410,9 @@ void DDResultPanel(NSString *title, NSString *path) {
     [shareBtn addTarget:[DDPanelActions shared] action:@selector(buttonTapped:)
                           forControlEvents:UIControlEventTouchUpInside];
     shareBtn.tag = 1000;
+    [saveBtn addTarget:[DDPanelActions shared] action:@selector(buttonTapped:)
+                        forControlEvents:UIControlEventTouchUpInside];
+    saveBtn.tag = 1003;
     [openBtn addTarget:[DDPanelActions shared] action:@selector(buttonTapped:)
                         forControlEvents:UIControlEventTouchUpInside];
     openBtn.tag = 1001;
@@ -411,6 +423,7 @@ void DDResultPanel(NSString *title, NSString *path) {
     [DDPanelActions shared].currentHandler = ^(NSInteger idx) {
       dd_dismiss_card(card, ^{
         if (idx == 0) doShare();
+        else if (idx == 3) DDSaveToFiles([NSURL fileURLWithPath:path]);
         else if (idx == 1) doBrowse();
       });
     };

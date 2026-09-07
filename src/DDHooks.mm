@@ -10,6 +10,9 @@
 
 #import "DDHooks.h"
 #import "DDCore.h"
+
+// Durum panosu için: kaç C sembolü bağlandı (fishhook)
+int dd_g_hooked_count = 0;
 #import "DDOverride.h"
 #import "fishhook.h"
 
@@ -373,6 +376,7 @@ void DDInstallCHooks(void) {
   };
   size_t n = sizeof(rebs) / sizeof(rebs[0]);
   int rc = rebind_symbols(rebs, n);
+  dd_g_hooked_count = (int)n;
   DDLog(@"🔗 fishhook: %zu sembol bağlandı (%@)", n, rc == 0 ? @"tamam" : @"hata");
 
   // atlanan olay sayısını periyodik raporla

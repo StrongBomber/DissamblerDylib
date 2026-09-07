@@ -9,6 +9,16 @@ CydiaSubstrate / ElleKit **gerekmez** — hook'lar [fishhook](https://github.com
 
 ---
 
+## 🔥 v2.3 — "çalışıyor mu bilemiyorum" bitti: Durum panosu + iGameGod/Filza akışları
+
+| Yenilik | Ne yapar |
+|---|---|
+| **🟢 DURUM paneli** (menünün en üstü) | "DDumper ÇALIŞIYOR" kanıtı: çalışma süresi, hook sayısı, yakalanan dosya, dump sayısı, erişilen dosya, toplam erişim, boş disk — **canlı yenilenen sayaçlar**. Tek bakışta araçların çalıştığını GÖRÜRSÜNÜZ |
+| **Yeşil nabız noktası** | Yüzen DD butonunda sürekli nabız atan yeşil nokta = dylib canlı. Açılışta "✅ DDumper aktif" balonu çıkar |
+| **⚡ Bellek arıtma (iGameGod tarzı)** | Değer arattıktan sonra: **Değişen / Değişmeyen / Artan / Azalan** ile sonuçları daralt — değer bilinmese bile hile değeri bulunur. Listeye dokununca değeri poke edin |
+| **📁 Dosyalar'a kaydet (Filza tarzı)** | Her yerde: uzun bas → "Dosyalar'a kaydet"; sonuç panosunda ayrı düğme. UIDocumentPicker ile DOĞRUDAN Dosyalar uygulamasına kaydeder — paylaşım sayfası hiç açılmaz |
+| Hızlı erişim | Durum panelinden tek dokunuşla Canlı Konsol (kanıt akışı), Yakalananlar, Dump Çıktıları |
+
 ## 🛠 v2.2 — "oyuna dokunulamıyor / DB / çıktı görünmüyor" çözüldü
 
 | Sorun | Kök neden | Çözüm |

@@ -490,6 +490,19 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   }
 }
 
+- (void)zipAndSaveToFiles:(NSString *)dir {
+  DDShowProgress(@"ZIP hazırlanıyor…");
+  [DDDumpService zipDirectory:dir completion:^(NSString *zipPath, NSError *error) {
+    DDHideProgress();
+    if (zipPath) {
+      DDToast(@"ZIP hazır — kaydetme açılıyor");
+      DDSaveToFiles([NSURL fileURLWithPath:zipPath]);
+    } else {
+      DDAlert(@"ZIP", error.localizedDescription ?: @"Başarısız (4GB sınırı?)");
+    }
+  }];
+}
+
 - (void)zipAndShare:(NSString *)dir {
   DDShowProgress(@"ZIP hazırlanıyor…");
   [DDDumpService zipDirectory:dir completion:^(NSString *zipPath, NSError *error) {
@@ -533,6 +546,7 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
     ]];
   }
   [titles addObject:@"📤 Paylaş"];
+  [titles addObject:@"📁 Dosyalar'a kaydet"];
   if (e.isDir) [titles addObject:@"🗜 ZIP olarak paylaş"];
   [titles addObjectsFromArray:@[@"📋 Yolu kopyala", @"ℹ️ Özellikler", @"Kapat"]];
 
@@ -547,6 +561,14 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
       if (idx == i) { DDDBBrowserVC *vc = [[DDDBBrowserVC alloc] initWithDBPath:e.path]; [ws.navigationController pushViewController:vc animated:YES]; return; } i++;
     }
     if (idx == i) { [ws shareEntry:e]; return; } i++;
+    if (idx == i) {
+      if (e.isDir) {
+        [ws zipAndSaveToFiles:e.path];
+      } else {
+        DDSaveToFiles([NSURL fileURLWithPath:e.path]);
+      }
+      return;
+    } i++;
     if (e.isDir) { if (idx == i) { [ws zipAndShare:e.path]; return; } i++; }
     if (idx == i) { UIPasteboard.generalPasteboard.string = e.path; DDToast(@"Yol kopyalandı"); return; } i++;
     if (idx == i) {
@@ -574,15 +596,6 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 @end
 
 #pragma mark - DDConsoleVC
-
-@interface DDConsoleVC : UIViewController
-@property (nonatomic, strong) UITextView *tv;
-@property (nonatomic) NSUInteger lastSeen;
-@property (nonatomic, strong) NSTimer *timer;
-@property (nonatomic) BOOL paused;
-@property (nonatomic, strong) UISegmentedControl *filterSeg;
-@property (nonatomic) NSMutableArray<NSString *> *backlog; // filtre dışı kalanlar
-@end
 
 @implementation DDConsoleVC
 
@@ -1043,9 +1056,12 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
   }
   self.presentationController.delegate = self;
 
-  _sectionTitles = @[@"İNCELEME", @"CANLI DÜZENLEME", @"DOSYA ARAÇLARI",
+  _sectionTitles = @[@"DURUM", @"İNCELEME", @"CANLI DÜZENLEME", @"DOSYA ARAÇLARI",
                      @"GELİŞMİŞ", @"DUMP", @""];
   _sections = @[
+    @[
+      @{@"icon": @"🟢", @"title": @"DURUM", @"sub": @"Çalışıyor mu? Canlı sayaçlar + kanıt + hızlı erişim"},
+    ],
     @[
       @{@"icon": @"📦", @"title": @"Uygulama Paketi", @"sub": @"Bundle içeriğini gez, önizle, düzenle"},
       @{@"icon": @"🏠", @"title": @"Uygulama Sandbox'ı", @"sub": @"Documents / Library / tmp"},
@@ -1214,7 +1230,10 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
   [tableView deselectRowAtIndexPath:indexPath animated:YES];
   UINavigationController *nav = self.navigationController;
   switch (indexPath.section) {
-    case 0:
+    case 0: // DURUM
+      [nav pushViewController:[DDStatusVC new] animated:YES];
+      break;
+    case 1:
       switch (indexPath.row) {
         case 0: [self pushBrowser:[DDCore bundlePath]]; break;
         case 1: [self pushBrowser:[DDCore homePath]]; break;
@@ -1222,33 +1241,33 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
         case 3: [nav pushViewController:[DDConsoleVC new] animated:YES]; break;
       }
       break;
-    case 1:
+    case 2:
       switch (indexPath.row) {
         case 0: [nav pushViewController:[DDOverrideManagerVC new] animated:YES]; break;
         case 1: [nav pushViewController:[DDDefaultsVC new] animated:YES]; break;
         case 2: [nav pushViewController:[DDMemoryVC new] animated:YES]; break;
       }
       break;
-    case 2:
+    case 3:
       switch (indexPath.row) {
         case 0: [nav pushViewController:[DDSearchVC new] animated:YES]; break;
         case 1: [nav pushViewController:[DDDBPickerVC new] animated:YES]; break;
       }
       break;
-    case 3:
+    case 4:
       switch (indexPath.row) {
         case 0: [nav pushViewController:[DDImagesVC new] animated:YES]; break;
         case 1: [nav pushViewController:[DDClassesVC new] animated:YES]; break;
       }
       break;
-    case 4:
+    case 5:
       switch (indexPath.row) {
         case 0: [self startSmartDump]; break;
         case 1: [self startFullDump]; break;
         case 2: [self pushBrowser:[DDCore dumpsPath]]; break;
       }
       break;
-    case 5:
+    case 6:
       [nav pushViewController:[DDSettingsVC new] animated:YES];
       break;
   }
@@ -1451,7 +1470,36 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
   [self.button addGestureRecognizer:lp];
 
   [root.view addSubview:self.button];
+
+  // Yaşam göstergesi: yeşil nabız noktası (araç çalışıyor kanıtı)
+  UIView *dot = [[UIView alloc] initWithFrame:CGRectMake(34, 2, 12, 12)];
+  dot.backgroundColor = [UIColor colorWithRed:0.2 green:0.9 blue:0.4 alpha:1.0];
+  dot.layer.cornerRadius = 6;
+  dot.layer.borderColor = [UIColor colorWithWhite:0 alpha:0.3].CGColor;
+  dot.layer.borderWidth = 1.5;
+  dot.tag = 777;
+  [self.button addSubview:dot];
+  [self.button bringSubviewToFront:dot];
+  CABasicAnimation *pulse = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
+  pulse.fromValue = @1.0;
+  pulse.toValue = @1.35;
+  pulse.duration = 0.8;
+  pulse.autoreverses = YES;
+  pulse.repeatCount = HUGE_VALF;
+  pulse.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+  [dot.layer addAnimation:pulse forKey:@"pulse"];
+
   DDLog(@"🛠 Yüzen buton aktif — dokunun: menü, basılı tut: gizle");
+
+  // İlk kurulumda kullanıcıya görünür kanıt: araç YÜKLÜ ve ÇALIŞIYOR
+  static BOOL dd_announced = NO;
+  if (!dd_announced) {
+    dd_announced = YES;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+      DDToast(@"✅ DDumper aktif — DD butonuna dokun");
+    });
+  }
 }
 
 - (void)buttonTapped {

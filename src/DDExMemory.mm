@@ -11,6 +11,7 @@
 
 #import "DDFeatures.h"
 #import "DDCore.h"
+#include <math.h>
 #import "DDUICommon.h"
 #import "DDPanels.h"
 
@@ -183,6 +184,17 @@ static NSArray<NSNumber *> *DDMemScan(const void *pattern, NSUInteger patSize,
 }
 
 /// Adresten mevcut değeri oku
+/// Adresteki değeri double olarak oku (arıtma karşılaştırmaları için)
+static double DDMemReadValue(uint64_t addr, DDMemType t) {
+  uint8_t buf[8];
+  NSUInteger size = DDMemTypeSize(t);
+  if (!DDMemRead(addr, buf, size)) return NAN;
+  if (t == DDMemI32) { int32_t v; memcpy(&v, buf, 4); return (double)v; }
+  if (t == DDMemI64) { int64_t v; memcpy(&v, buf, 8); return (double)v; }
+  if (t == DDMemF32) { float v; memcpy(&v, buf, 4); return (double)v; }
+  double v; memcpy(&v, buf, 8); return v;
+}
+
 static BOOL DDMemRead(uint64_t addr, void *out, NSUInteger size) {
   mach_vm_size_t got = 0;
   kern_return_t kr = mach_vm_read_overwrite(mach_task_self(), addr, size,
@@ -235,6 +247,9 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
 @property (nonatomic, strong) UILabel *status;
 @property (nonatomic, strong) UITableView *table;
 @property (nonatomic, strong) NSMutableArray<NSNumber *> *addresses;
+@property (nonatomic, strong) NSMutableArray<NSNumber *> *lastVals; // son okunan değerler (double)
+@property (nonatomic, strong) UISegmentedControl *modeSeg;
+@property (nonatomic, strong) UIButton *applyBtn;
 @property (nonatomic, strong) NSTimer *watchTimer;
 @property (nonatomic) DDMemType type;
 @property (nonatomic) BOOL scanning;
@@ -248,6 +263,7 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
   self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
   self.type = DDMemI32;
   self.addresses = [NSMutableArray array];
+  self.lastVals = [NSMutableArray array];
 
   CGFloat w = self.view.bounds.size.width;
 
@@ -277,17 +293,35 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
   self.filterBtn.titleLabel.font = [UIFont systemFontOfSize:13];
   [self.filterBtn addTarget:self action:@selector(refineSearch) forControlEvents:UIControlEventTouchUpInside];
 
+  // iGameGod tarzı arıtma: değişen/değişmeyen/artan/azalan
+  self.modeSeg = [[UISegmentedControl alloc]
+      initWithItems:@[@"Değişen", @"Değişmeyen", @"Artan", @"Azalan"]];
+  self.modeSeg.frame = CGRectMake(12, 140, w - 24, 30);
+  self.modeSeg.selectedSegmentIndex = 0;
+  self.modeSeg.enabled = NO;
+
+  self.applyBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+  self.applyBtn.frame = CGRectMake(12, 178, w - 24, 34);
+  self.applyBtn.backgroundColor = [UIColor colorWithRed:0.55 green:0.25 blue:0.85 alpha:1.0];
+  self.applyBtn.tintColor = [UIColor whiteColor];
+  self.applyBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+  self.applyBtn.layer.cornerRadius = 8;
+  [self.applyBtn setTitle:@"⚡ Arıt: seçili koşulu uygula" forState:UIControlStateNormal];
+  [self.applyBtn addTarget:self action:@selector(applyModeFilter)
+              forControlEvents:UIControlEventTouchUpInside];
+  self.applyBtn.enabled = NO;
+
   self.watchBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-  self.watchBtn.frame = CGRectMake(12, 140, w - 24, 32);
+  self.watchBtn.frame = CGRectMake(12, 220, w - 24, 32);
   [self.watchBtn setTitle:@"👁 İzlemeyi başlat (1sn)" forState:UIControlStateNormal];
   [self.watchBtn addTarget:self action:@selector(toggleWatch) forControlEvents:UIControlEventTouchUpInside];
 
-  self.status = [[UILabel alloc] initWithFrame:CGRectMake(12, 178, w - 24, 20)];
+  self.status = [[UILabel alloc] initWithFrame:CGRectMake(12, 258, w - 24, 20)];
   self.status.font = DDMonoFont(11);
   self.status.textColor = [UIColor grayColor];
   self.status.text = @"Heap + uygulama bölgeleri taranır. Sistem kütüphaneleri atlanır.";
 
-  self.table = [[UITableView alloc] initWithFrame:CGRectMake(0, 206, w, self.view.bounds.size.height - 206)
+  self.table = [[UITableView alloc] initWithFrame:CGRectMake(0, 286, w, self.view.bounds.size.height - 286)
                                            style:UITableViewStylePlain];
   self.table.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
   self.table.dataSource = self;
@@ -295,7 +329,8 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
   self.table.rowHeight = 44;
 
   for (UIView *v in @[self.typeSeg, self.valueField, self.searchBtn,
-                     self.filterBtn, self.watchBtn, self.status, self.table]) {
+                     self.filterBtn, self.modeSeg, self.applyBtn,
+                     self.watchBtn, self.status, self.table]) {
     [self.view addSubview:v];
   }
 
@@ -310,6 +345,9 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
 
 - (void)clearResults {
   [self.addresses removeAllObjects];
+  [self.lastVals removeAllObjects];
+  self.modeSeg.enabled = NO;
+  self.applyBtn.enabled = NO;
   [self.table reloadData];
   self.status.text = @"Sonuçlar temizlendi.";
 }
@@ -387,10 +425,69 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
   self.scanning = NO;
   self.searchBtn.enabled = YES;
   self.filterBtn.enabled = YES;
-  self.status.text = [NSString stringWithFormat:@"%lu sonuç • taranan: %@ / %@",
+  BOOL has = result.count > 0;
+  self.modeSeg.enabled = has;
+  self.applyBtn.enabled = has;
+  self.status.text = [NSString stringWithFormat:@"%lu sonuç • taranan: %@ / %@%@",
                       (unsigned long)result.count,
-                      [DDCore humanSize:scanned], [DDCore humanSize:total]];
+                      [DDCore humanSize:scanned], [DDCore humanSize:total],
+                      has ? @"" : @" • yeni arama yapın"];
   [self.table reloadData];
+  [self snapshotValues];
+}
+
+/// Sonuç adreslerinin ŞİMDİKİ değerlerini sakla — Arıtma karşılaştırması için
+- (void)snapshotValues {
+  NSArray<NSNumber *> *addrs = [self.addresses copy];
+  DDMemType t = self.type;
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    NSMutableArray *vals = [NSMutableArray array];
+    for (NSNumber *a in addrs) {
+      [vals addObject:@(DDMemReadValue(a.unsignedLongLongValue, t))];
+      if (vals.count >= 20000) break;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (vals.count == self.addresses.count) self.lastVals = vals;
+    });
+  });
+}
+
+/// Seçili koşula göre sonuçları arıt (iGameGod 'refine')
+- (void)applyModeFilter {
+  if (self.scanning) return;
+  if (self.addresses.count == 0 || !self.lastVals ||
+      self.lastVals.count != self.addresses.count) {
+    DDToast(@"Önce bir arama yapın");
+    return;
+  }
+  NSInteger mode = self.modeSeg.selectedSegmentIndex; // 0 değişen 1 değişmeyen 2 artan 3 azalan
+  NSMutableArray *keepAddr = [NSMutableArray array];
+  NSMutableArray *keepVal = [NSMutableArray array];
+  for (NSUInteger i = 0; i < self.addresses.count; i++) {
+    double prev = self.lastVals[i].doubleValue;
+    double cur = DDMemReadValue(self.addresses[i].unsignedLongLongValue, self.type);
+    BOOL ok = NO;
+    if (mode == 0) ok = (cur != prev);
+    else if (mode == 1) ok = (cur == prev);
+    else if (mode == 2) ok = (cur > prev);
+    else ok = (cur < prev);
+    if (ok) {
+      [keepAddr addObject:self.addresses[i]];
+      [keepVal addObject:@(cur)];
+    }
+  }
+  self.addresses = keepAddr;
+  self.lastVals = keepVal;
+  self.applyBtn.enabled = keepAddr.count > 0;
+  self.modeSeg.enabled = keepAddr.count > 0;
+  NSString *mName = @[@"değişen", @"değişmeyen", @"artan", @"azalan"][mode];
+  self.status.text = [NSString stringWithFormat:@"⚡ %lu sonuç kaldı (%@) — tekrar arıtabilirsiniz",
+                      (unsigned long)keepAddr.count, mName];
+  [self.table reloadData];
+  if (keepAddr.count > 0 && keepAddr.count <= 20) {
+    DDToast([NSString stringWithFormat:@"%lu adres kaldı — listeye dokunup değeri değiştirin",
+             (unsigned long)keepAddr.count]);
+  }
 }
 
 - (void)newSearch { [self beginScan:NO]; }

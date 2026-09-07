@@ -8,7 +8,10 @@
 #include <sys/stat.h>
 #include <mach-o/dyld.h>
 
-NSString *const DDVersionString = @"2.2.0";
+NSString *const DDVersionString = @"2.3.0";
+
+// dylib yüklenme anı (static init) — Durum panosu çalışma süresi için
+CFAbsoluteTime dd_g_load_time = CFAbsoluteTimeGetCurrent();
 
 #pragma mark - Ayar önbelleği (hot-path)
 

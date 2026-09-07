@@ -48,6 +48,23 @@ void DDToast(NSString *message) {
 
 #pragma mark - Paylaşım
 
+void DDSaveToFiles(NSURL *url) {
+  if (![NSThread isMainThread]) {
+    dispatch_async(dispatch_get_main_queue(), ^{ DDSaveToFiles(url); });
+    return;
+  }
+  if (@available(iOS 11.0, *)) {
+    UIDocumentPickerViewController *picker =
+        [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url]
+                                                        asCopy:YES];
+    UIViewController *vc = DDTopMostVC();
+    [DDOverlayRoot panelWillAppear];
+    [vc presentViewController:picker animated:YES completion:nil];
+  } else {
+    DDShareURL(url); // iOS 11 altı: paylaşım sayfası yeterli
+  }
+}
+
 void DDShareURL(NSURL *url) {
   if (!url) return;
   dispatch_async(dispatch_get_main_queue(), ^{

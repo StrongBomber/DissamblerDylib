@@ -7,6 +7,16 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+#pragma mark - Durum panosu (DDStatusVC.mm)
+
+@interface DDStatusVC : UIViewController
+@end
+
+#pragma mark - Canlı konsol (DDUI.mm içinde, ortak kullanım için burada bildirilir)
+
+@interface DDConsoleVC : UIViewController
+@end
+
 #pragma mark - Dosya tarayıcı (DDUI.mm içinde, ortak kullanım için burada bildirilir)
 
 @interface DDBrowserEntry : NSObject

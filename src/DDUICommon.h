@@ -15,6 +15,9 @@ void DDAlert(NSString *title, NSString *message);
 void DDAlertOnMain(NSString *title, NSString *message); // arka plandan güvenilir çağrı
 
 void DDShareURL(NSURL *url);
+/// Dosyayı Dosyalar uygulamasına DOĞRUDAN kaydeder (UIDocumentPicker,
+/// Filza'daki 'Save to Files' akışı) — paylaşım sayfası hiç açılmaz
+void DDSaveToFiles(NSURL *url);
 void DDShareText(NSString *text, NSString *fileName);
 
 /// Uzun işlemler için HUD (kendi penceresinde, sunum çakışması yok)
