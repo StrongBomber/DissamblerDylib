@@ -28,6 +28,10 @@ extern "C" {
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
+
+// iOS SDK'da mach_vm_* bildirimi yok → elle
+kern_return_t mach_vm_read_overwrite(vm_map_t, mach_vm_address_t, mach_vm_size_t,
+                                     mach_vm_address_t, mach_vm_size_t *);
 }
 
 // DDExMemory.mm içindeki köprüler
@@ -444,7 +448,8 @@ static int dd_lua_prompt(lua_State *L) {
     if ([f[@"switch"] boolValue]) {
       lua_pushboolean(L, [vals[i] isEqualToString:@"true"]);
     } else {
-      const char *s = vals[i].UTF8String;
+      NSString *sv = vals[i];
+      const char *s = sv.UTF8String;
       lua_pushstring(L, s ?: "");
     }
     lua_rawseti(L, -2, (int)i + 1);
@@ -1155,7 +1160,7 @@ static void dd_open_gg(lua_State *L) {
 
 #pragma mark - Canlı konsol ekranı
 
-@interface DDScriptConsoleVC : UIViewController
+@interface DDScriptConsoleVC ()
 @property (nonatomic, copy) NSString *scriptPath;
 @property (nonatomic, strong) UITextView *tv;
 @property (nonatomic, strong) UIBarButtonItem *stopBtn;
