@@ -1080,13 +1080,7 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
   NSString *t = (section < (NSInteger)_sectionTitles.count) ? _sectionTitles[section] : nil;
-  if (t.length == 0) return nil;
-  NSAttributedString *attr = [[NSAttributedString alloc]
-      initWithString:t attributes:@{NSForegroundColorAttributeName: DDMenuSub2(),
-                                    NSFontAttributeName: [UIFont boldSystemFontOfSize:11]}];
-  UILabel *lbl = [UILabel new];
-  lbl.attributedText = attr;
-  return t;
+  return (t.length > 0) ? t : nil;
 }
 
 - (void)tableView:(UITableView *)tableView willDisplayHeaderView:(UIView *)view
@@ -1108,11 +1102,6 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
   NSString *t = (section < (NSInteger)_sectionTitles.count) ? _sectionTitles[section] : nil;
   return (t.length > 0) ? 30 : 8;
-}
-
-- (nullable NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-  if (section == 0 || section >= _sectionTitles.count) return nil;
-  return _sectionTitles[section];
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
@@ -1385,7 +1374,9 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
 
 - (void)buttonTapped {
   if (@available(iOS 10.0, *)) {
-    [[UIImpactFeedbackGenerator style:UIImpactFeedbackStyleMedium] impactOccurred];
+    UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc]
+        initWithStyle:UIImpactFeedbackStyleMedium];
+    [gen impactOccurred];
   }
   [self openMenu];
 }

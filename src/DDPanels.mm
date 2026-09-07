@@ -359,7 +359,6 @@ void DDConfirmPanel(NSString *title, NSString *message, NSArray<NSString *> *but
         if (handler) handler(idx);
       });
     };
-    [DDPanelActions shared].currentCard = card;
 
     dd_present_card(card, nil);
   });
@@ -474,7 +473,6 @@ void DDInputPanelShow(NSString *title, NSString *message, NSArray<NSDictionary *
     [DDPanelActions shared].currentHandler = ^(NSInteger idx) {
       finish(idx);
     };
-    [DDPanelActions shared].currentCard = card;
 
     dd_present_card(card, ^{
       // kartı gösterirken ilk alana odak ver (klavye bizim key window'da açılır)
