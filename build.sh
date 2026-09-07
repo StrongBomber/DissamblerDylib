@@ -51,6 +51,9 @@ if [ ! -f "$LUA_DIR/lua.h" ]; then
   mkdir -p "$LUA_DIR"
   cp "$SRCDIR"*.c "$SRCDIR"*.h "$LUA_DIR/"
   rm -f "$LUA_DIR/lua.c" "$LUA_DIR/luac.c" "$LUA_DIR/onelua.c"
+  # iOS'ta system() yok — os.execute sessizce 'başarısız' dönsün
+  sed -i '' 's/stat = system(cmd);/stat = -1; (void)cmd;/' "$LUA_DIR/loslib.c" 2>/dev/null || \
+  sed -i 's/stat = system(cmd);/stat = -1; (void)cmd;/' "$LUA_DIR/loslib.c"
 fi
 
 echo "→ Lua derleniyor (C)…"
