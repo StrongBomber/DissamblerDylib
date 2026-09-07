@@ -1,0 +1,27 @@
+SDK: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk
+→ fishhook derleniyor (C)…
+→ DDumper derleniyor (Objective-C++)…
+src/DDImageDumper.mm:195:13: warning: variable 'mainExec' set but not used [-Wunused-but-set-variable]
+  NSString *mainExec = nil;
+            ^
+1 warning generated.
+src/DDPanels.mm:362:29: error: property 'currentCard' not found on object of type 'DDPanelActions *'
+    [DDPanelActions shared].currentCard = card;
+                            ^
+src/DDPanels.mm:477:29: error: property 'currentCard' not found on object of type 'DDPanelActions *'
+    [DDPanelActions shared].currentCard = card;
+                            ^
+2 errors generated.
+src/DDUI.mm:1113:1: error: duplicate declaration of method 'tableView:titleForHeaderInSection:'
+- (nullable NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+^
+src/DDUI.mm:1081:1: note: previous declaration is here
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+^
+src/DDUI.mm:1388:33: error: no known class method for selector 'style:'
+    [[UIImpactFeedbackGenerator style:UIImpactFeedbackStyleMedium] impactOccurred];
+                                ^~~~~
+src/DDUI.mm:1442:31: warning: unused variable 'ws' [-Wunused-variable]
+  __weak DDOverlayController *ws = self;
+                              ^
+1 warning and 2 errors generated.
