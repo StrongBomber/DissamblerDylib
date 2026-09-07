@@ -1,0 +1,6 @@
+SDK: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk
+→ fishhook derleniyor (C)…
+→ Lua 5.3.6 indiriliyor…
+  kaynak: https://www.lua.org/ftp/lua-5.3.6.tar.gz
+  açılan: /tmp/lua_x/lua-5.3.6/
+❌ lua.h bulunamadı (arşiv bozuk?)
