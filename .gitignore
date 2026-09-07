@@ -10,3 +10,6 @@ build/
 *.swp
 .idea/
 .vscode/
+
+# Lua 5.3 kaynakları (derleme sırasında indirilir)
+src/lua/

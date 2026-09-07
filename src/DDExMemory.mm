@@ -257,6 +257,28 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
 @property (nonatomic) BOOL scanning;
 @end
 
+#pragma mark - Lua motoru için köprü (DDScript.mm kullanır)
+
+NSArray<NSDictionary *> *DDMemGetRegionList(void) {
+  NSMutableArray *out = [NSMutableArray array];
+  for (DDMemRegion *r in DDMemCollectRegions()) {
+    [out addObject:@{
+      @"start": @(r.addr),
+      @"size": @(r.size),
+      @"label": r.label ?: @"Heap",
+    }];
+  }
+  return out;
+}
+
+BOOL DDMemReadAt(uint64_t addr, void *out, NSUInteger size) {
+  return DDMemRead(addr, out, size);
+}
+
+BOOL DDMemWriteAt(uint64_t addr, const void *data, NSUInteger size) {
+  return DDMemWrite(addr, data, size);
+}
+
 @implementation DDMemoryVC
 
 - (void)viewDidLoad {

@@ -11,6 +11,7 @@
 #import "DDCore.h"
 #import "DDImageDumper.h"
 #import "DDIl2Cpp.h"
+#import "DDScript.h"
 #import "DDDumpService.h"
 #import "DDZipWriter.h"
 #import "DDUICommon.h"
@@ -555,12 +556,14 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 
   NSMutableArray<NSString *> *titles = [NSMutableArray array];
   BOOL isMacho = !e.isDir && [DDImageDumper isMachOFile:e.path];
+  BOOL isLua = !e.isDir && [e.path.pathExtension.lowercaseString isEqualToString:@"lua"];
   if (!e.isDir) {
     [titles addObjectsFromArray:@[
       @"📄 Önizle", @"✏️ Düzenle (canlı)", @"🔩 Hex editör (canlı)",
       @"🧠 Analiz et", @"🧵 String'leri çıkar", @"🗃 Veritabanı olarak aç",
     ]];
     if (isMacho) [titles insertObject:@"🔓 Decrypt edilmiş kaydet" atIndex:0];
+    if (isLua) [titles insertObject:@"▶️ Çalıştır (GameGuardian Lua)" atIndex:0];
   }
   [titles addObject:@"📤 Paylaş"];
   [titles addObject:@"📁 Dosyalar'a kaydet"];
@@ -570,6 +573,15 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   DDConfirmPanel(e.name, e.path, titles, -1, ^(NSInteger idx) {
     NSInteger i = 0;
     if (!e.isDir) {
+      if (isLua) {
+        if (idx == i) {
+          if ([DDScript running]) { DDToast(@"Başka bir script çalışıyor — bekleyin"); return; }
+          DDScriptConsoleVC *vc = [[DDScriptConsoleVC alloc] initWithScript:e.path];
+          [ws.navigationController pushViewController:vc animated:YES];
+          return;
+        }
+        i++;
+      }
       if (isMacho) {
         if (idx == i) {
           // 🔓 Decrypt edilmiş kaydet — browse sırasında şifre çözme
@@ -1116,6 +1128,7 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
       @{@"icon": @"✏️", @"title": @"Canlı Düzenlemeler", @"sub": @"Aktif override'ları yönet — oyun senin sürümünü okur"},
       @{@"icon": @"🔧", @"title": @"UserDefaults (Canlı)", @"sub": @"Oyun ayar/para anahtarlarını anında değiştir"},
       @{@"icon": @"🧠", @"title": @"Bellek Tarayıcı", @"sub": @"Değer ara, izle, poke et (canlı hile)"},
+      @{@"icon": @"📜", @"title": @"Lua Script (GameGuardian)", @"sub": @"GG scriptleri birebir çalışır — .lua dosyalarını çalıştır, düzenle"},
     ],
     @[
       @{@"icon": @"🔍", @"title": @"İçerikte Ara", @"sub": @"Bundle/sandbox içinde grep + hex arama"},
@@ -1292,6 +1305,7 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
         case 0: [nav pushViewController:[DDOverrideManagerVC new] animated:YES]; break;
         case 1: [nav pushViewController:[DDDefaultsVC new] animated:YES]; break;
         case 2: [nav pushViewController:[DDMemoryVC new] animated:YES]; break;
+        case 3: [nav pushViewController:[DDScriptsVC new] animated:YES]; break;
       }
       break;
     case 3:

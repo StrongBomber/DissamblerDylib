@@ -29,7 +29,31 @@ xcrun -sdk iphoneos clang -arch arm64 -isysroot "$SDK" \
   -miphoneos-version-min="$MIN_IOS" -O2 \
   -c src/fishhook.c -o "$OUT/fishhook.o"
 
-echo "→ DDumper derleniyor (Objective-C++)…"
+# ── Lua 5.3 (GameGuardian uyumlu script motoru) ─────────────────────
+LUA_DIR="src/lua"
+if [ ! -f "$LUA_DIR/lua.h" ]; then
+  echo "→ Lua 5.3.6 indiriliyor…"
+  ( curl -fsSL --retry 2 https://lua.org/ftp/lua-5.3.6.tar.gz -o /tmp/lua.tar.gz ) || \
+  ( curl -fsSL --retry 2 https://github.com/lua/lua/archive/refs/tags/v5.3.6.tar.gz -o /tmp/lua.tar.gz ) || \
+  { echo "❌ Lua kaynakları indirilemedi (ağ gerekli)"; exit 1; }
+  rm -rf /tmp/lua-5.3.6
+  tar -xzf /tmp/lua.tar.gz -C /tmp
+  mkdir -p "$LUA_DIR"
+  cp /tmp/lua-5.3.6/*.c /tmp/lua-5.3.6/*.h "$LUA_DIR/"
+  rm -f "$LUA_DIR/lua.c" "$LUA_DIR/luac.c" "$LUA_DIR/onelua.c"
+fi
+
+echo "→ Lua derleniyor (C)…"
+LUA_OBJS=""
+for f in "$LUA_DIR"/*.c; do
+  o="$OUT/$(basename "$f" .c)_lua.o"
+  xcrun -sdk iphoneos clang -arch arm64 -isysroot "$SDK" \
+    -miphoneos-version-min="$MIN_IOS" -O2 -w \
+    -c "$f" -o "$o" || exit 1
+  LUA_OBJS="$LUA_OBJS $o"
+done
+
+echo "→ DDumper derleniyor (Objective-C++)…" 
 xcrun -sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" \
   -miphoneos-version-min="$MIN_IOS" \
   -std=gnu++17 -fobjc-arc -O2 \
@@ -57,9 +81,11 @@ xcrun -sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" \
   src/DDExSearch.mm \
   src/DDExDefaults.mm \
   src/DDSmartDump.mm \
+  src/DDScript.mm \
   src/DDUI.mm \
   src/DDEntry.mm \
   "$OUT/fishhook.o" \
+  $LUA_OBJS \
   -o "$OUT/$DYLIB_NAME"
 
 echo "→ Ad-hoc imzalanıyor…"

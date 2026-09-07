@@ -71,6 +71,7 @@ void DDLogEvent(NSString *kind, NSString * _Nullable path, NSString * _Nullable 
 + (NSString *)documentsPath;     // <home>/Documents
 + (NSString *)basePath;          // <Documents>/DDumper
 + (NSString *)dumpsPath;         // <base>/Dumps
++ (NSString *)scriptsPath;       // <base>/Scripts (GameGuardian uyumlu Lua)
 + (NSString *)capturedPath;      // <base>/Captured
 + (NSString *)logsPath;          // <base>/Logs
 + (NSString *)overridesPath;     // <base>/Overrides (canlı düzenleme kopyaları)

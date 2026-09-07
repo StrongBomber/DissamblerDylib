@@ -9,6 +9,32 @@ CydiaSubstrate / ElleKit **gerekmez** — hook'lar [fishhook](https://github.com
 
 ---
 
+## 📜 v2.5 — GAMEGUARDIAN LUCA SCRIPT MOTORU (birebir uyumlu)
+
+| Özellik | Detay |
+|---|---|
+| **Lua 5.3 yorumlayıcı** | Dylib'e gömülü (derleme sırasında resmî kaynaktan indirilir). Scriptler iOS'in içinde, oyunun sürecinde çalışır |
+| **gg.* API birebir** | GameGuardian için yazılmış scriptler **olduğu gibi** çalışır: `gg.searchNumber('999', gg.TYPE_DWORD)`, `gg.refineNumber`, `gg.getResults`, `gg.editAll`, `gg.setValues`, `gg.getValues` |
+| Grup araması | `'1;2;3::64'` sözdizimi (pencere içi sıralı değer arama) ve `'1~99'` aralık araması destekli |
+| Okuma/yazma | `readInteger/readFloat/readQword/readDouble` + `write*` (tek adres ya da tablo) |
+| GG arayüzü | `gg.alert`, `gg.prompt` (checkbox dahil), `gg.choice`, `gg.multiChoice`, `gg.toast` — hepsi oyun üstünde panel olarak açılır, script cevabı bekler |
+| Bölgeler | `gg.setRanges(gg.REGION_C_ALLOC \| gg.REGION_ANONYMOUS)`, `gg.getRangesList()` |
+| Süreç bilgisi | `gg.getTargetInfo()`, `gg.getSelectedPackage()`, `gg.copyText()` |
+| Dosya | `gg.getFileData`, `gg.saveFileData`, `gg.saveVariable` |
+| Uyumluluk | `gg.require`, `gg.VERSION_INT=10000` (GG 100.0 karşılığı), `os.exit` script'i bitirir (oyunu KİLITLEMEZ) |
+| Script yönetimi | Menü → **Lua Script (GameGuardian)**: scriptleri listele/çalıştır/düzenle/sil/paylaş. `.lua` dosyaları Dosyalar uygulamasından `DDumper/Scripts` klasörüne atılabilir. Herhangi bir `.lua`'ya tarayıcıda uzun basıp da çalıştırılabilir |
+| Canlı konsol | Script çalışırken her `print`/`gg.toast` satırı canlı akar; ⏹ İptal ile durdurulur |
+
+**Örnek** (GG'den kopyalanmış bir script olduğu gibi çalışır):
+```lua
+gg.searchNumber('999', gg.TYPE_DWORD)
+gg.refineNumber('1500', gg.TYPE_DWORD)
+local r = gg.getResults(10)
+for _, v in ipairs(r) do v.value = '999999' end
+gg.setValues(r)
+gg.toast('✔ Tamamlandı')
+```
+
 ## 🧬 v2.4 — İKİLİ DECRYPT MOTORU + IL2CPP DUMP (iGameGod'dan güçlü)
 
 | Yenilik | Ne yapar |

@@ -565,8 +565,33 @@ void DDInputPanelShow(NSString *title, NSString *message, NSArray<NSDictionary *
       [stack addArrangedSubview:ml];
     }
 
-    NSMutableArray<UITextField *> *inputs = [NSMutableArray array];
+    NSMutableArray<UIView *> *inputs = [NSMutableArray array]; // UITextField veya UISwitch
+    NSMutableArray<NSNumber *> *isSwitch = [NSMutableArray array];
     for (NSDictionary *f in fields) {
+      if ([f[@"switch"] boolValue]) {
+        // gg.prompt checkbox alanı: etiket + UISwitch
+        UISwitch *sw = [[UISwitch alloc] init];
+        sw.on = [f[@"value"] boolValue];
+        sw.onTintColor = DDPanelAccent();
+        UILabel *lbl = [[UILabel alloc] init];
+        lbl.text = f[@"placeholder"] ?: @"";
+        lbl.textColor = DDPanelText();
+        lbl.font = [UIFont boldSystemFontOfSize:14];
+        lbl.numberOfLines = 0;
+        UIStackView *row = [[UIStackView alloc] init];
+        row.axis = UILayoutConstraintAxisHorizontal;
+        row.spacing = 10;
+        row.alignment = UIStackViewAlignmentCenter;
+        [row addArrangedSubview:lbl];
+        [row addArrangedSubview:sw];
+        [inputs addObject:sw];
+        [isSwitch addObject:@YES];
+        [stack addArrangedSubview:row];
+        [NSLayoutConstraint activateConstraints:@[
+          [row.heightAnchor constraintGreaterThanOrEqualToConstant:38],
+        ]];
+        continue;
+      }
       UITextField *tf = [[UITextField alloc] init];
       tf.placeholder = f[@"placeholder"];
       tf.text = f[@"text"] ?: @"";
@@ -581,6 +606,7 @@ void DDInputPanelShow(NSString *title, NSString *message, NSArray<NSDictionary *
       if (kb) tf.keyboardType = (UIKeyboardType)kb.integerValue;
       tf.tag = 2000 + (NSInteger)inputs.count;
       [inputs addObject:tf];
+      [isSwitch addObject:@NO];
       [stack addArrangedSubview:tf];
       [NSLayoutConstraint activateConstraints:@[
         [tf.heightAnchor constraintEqualToConstant:38],
@@ -598,7 +624,14 @@ void DDInputPanelShow(NSString *title, NSString *message, NSArray<NSDictionary *
 
     void (^finish)(NSInteger) = ^(NSInteger idx) {
       NSMutableArray *vals = [NSMutableArray array];
-      for (UITextField *tf in inputs) [vals addObject:tf.text ?: @""];
+      for (NSUInteger i = 0; i < inputs.count; i++) {
+        UIView *v = inputs[i];
+        if ([isSwitch[i] boolValue]) {
+          [vals addObject:((UISwitch *)v).on ? @"true" : @"false"];
+        } else {
+          [vals addObject:((UITextField *)v).text ?: @""];
+        }
+      }
       dd_dismiss_card(card, ^{
         if (handler) handler(idx, vals);
       });
@@ -636,9 +669,14 @@ void DDInputPanelShow(NSString *title, NSString *message, NSArray<NSDictionary *
     };
 
     dd_present_card(card, ^{
-      // kartı gösterirken ilk alana odak ver (klavye bizim key window'da açılır)
+      // kartı gösterirken ilk METİN alanına odak ver (klavye bizim key window'da açılır)
       dispatch_async(dispatch_get_main_queue(), ^{
-        [inputs.firstObject becomeFirstResponder];
+        for (NSUInteger i = 0; i < inputs.count; i++) {
+          if (![isSwitch[i] boolValue]) {
+            [(UITextField *)inputs[i] becomeFirstResponder];
+            break;
+          }
+        }
       });
     });
   });

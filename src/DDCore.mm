@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <mach-o/dyld.h>
 
-NSString *const DDVersionString = @"2.3.0";
+NSString *const DDVersionString = @"2.5.0";
 
 // dylib yüklenme anı (static init) — Durum panosu çalışma süresi için
 CFAbsoluteTime dd_g_load_time = CFAbsoluteTimeGetCurrent();
@@ -310,6 +310,7 @@ void DDLogEvent(NSString *kind, NSString *path, NSString *extra) {
   return [[DDCore documentsPath] stringByAppendingPathComponent:@"DDumper"];
 }
 + (NSString *)dumpsPath   { return [[DDCore basePath] stringByAppendingPathComponent:@"Dumps"]; }
++ (NSString *)scriptsPath { return [[DDCore basePath] stringByAppendingPathComponent:@"Scripts"]; }
 + (NSString *)capturedPath{ return [[DDCore basePath] stringByAppendingPathComponent:@"Captured"]; }
 + (NSString *)logsPath    { return [[DDCore basePath] stringByAppendingPathComponent:@"Logs"]; }
 + (NSString *)overridesPath { return [[DDCore basePath] stringByAppendingPathComponent:@"Overrides"]; }
@@ -486,6 +487,7 @@ static NSMutableDictionary<NSString *, NSMutableDictionary *> *dd_stats = nil;
     [fm createDirectoryAtPath:[DDCore dumpsPath]    withIntermediateDirectories:YES attributes:nil error:nil];
     [fm createDirectoryAtPath:[DDCore capturedPath] withIntermediateDirectories:YES attributes:nil error:nil];
     [fm createDirectoryAtPath:[DDCore logsPath]     withIntermediateDirectories:YES attributes:nil error:nil];
+    [fm createDirectoryAtPath:[DDCore scriptsPath]  withIntermediateDirectories:YES attributes:nil error:nil];
     dispatch_async(dispatch_get_main_queue(), ^{
       [DDCore clearLog];
       DDLog(@"🧹 Tüm DDumper verisi temizlendi. Yeni log aktif.");
