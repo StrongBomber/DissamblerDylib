@@ -6,6 +6,7 @@
 #import "DDPanels.h"
 #import "DDUI.h"
 #import "DDCore.h"
+#import "DDDumpService.h"
 #import "DDFeatures.h"
 #import "DDUICommon.h"
 
@@ -395,7 +396,16 @@ void DDResultPanel(NSString *title, NSString *path) {
 
     // eylemler
     void (^doShare)(void) = ^{
-      DDShareURL([NSURL fileURLWithPath:path]);
+      if (isDir) {
+        DDShowProgress(@"ZIP hazırlanıyor…");
+        [DDDumpService zipDirectory:path completion:^(NSString *zipPath, NSError *zerr) {
+          DDHideProgress();
+          if (zipPath) DDShareURL([NSURL fileURLWithPath:zipPath]);
+          else DDAlert(@"ZIP", zerr.localizedDescription ?: @"Başarısız");
+        }];
+      } else {
+        DDShareURL([NSURL fileURLWithPath:path]);
+      }
     };
     void (^doBrowse)(void) = ^{
       DDBrowserVC *vc = [[DDBrowserVC alloc] initWithPath:browseDir];

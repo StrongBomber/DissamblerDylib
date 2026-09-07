@@ -10,6 +10,7 @@
 #import "DDUI.h"
 #import "DDCore.h"
 #import "DDImageDumper.h"
+#import "DDIl2Cpp.h"
 #import "DDDumpService.h"
 #import "DDZipWriter.h"
 #import "DDUICommon.h"
@@ -113,6 +114,20 @@
             @"⚠️ Dosya çok büyük (%@).\n\nBelleği korumak için önizleme devre dışı.\n"
              @"Sağ üstteki ⬆️ ile paylaşabilir, 🧠 ile analiz edebilirsiniz.",
             [DDCore humanSize:data.length]]];
+        return;
+      }
+
+      // Mach-O? → özet göster (decrypt yoluyla birlikte)
+      NSString *machoInfo = [DDImageDumper machoSummaryForPath:path];
+      if (machoInfo) {
+        [s showText:[NSString stringWithFormat:
+            @"🔩 MACH-O İKİLİ\n\n%@\n\nBoyut: %@\n\n"
+             @"Bu dosyayı ŞİFRESİZ almak için:\n"
+             @"1. Listede dosyaya uzun basın\n"
+             @"2. 🔓 'Decrypt edilmiş kaydet' seçin\n\n"
+             @"(Yüklü ve şifreli ise bellekten çözülür; IDA/Ghidra'da "
+             @"doğrudan açılır)",
+            machoInfo, [DDCore humanSize:data.length]]];
         return;
       }
 
@@ -539,11 +554,13 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   __weak typeof(self) ws = self;
 
   NSMutableArray<NSString *> *titles = [NSMutableArray array];
+  BOOL isMacho = !e.isDir && [DDImageDumper isMachOFile:e.path];
   if (!e.isDir) {
     [titles addObjectsFromArray:@[
       @"📄 Önizle", @"✏️ Düzenle (canlı)", @"🔩 Hex editör (canlı)",
       @"🧠 Analiz et", @"🧵 String'leri çıkar", @"🗃 Veritabanı olarak aç",
     ]];
+    if (isMacho) [titles insertObject:@"🔓 Decrypt edilmiş kaydet" atIndex:0];
   }
   [titles addObject:@"📤 Paylaş"];
   [titles addObject:@"📁 Dosyalar'a kaydet"];
@@ -553,6 +570,24 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   DDConfirmPanel(e.name, e.path, titles, -1, ^(NSInteger idx) {
     NSInteger i = 0;
     if (!e.isDir) {
+      if (isMacho) {
+        if (idx == i) {
+          // 🔓 Decrypt edilmiş kaydet — browse sırasında şifre çözme
+          DDShowProgress(@"🔓 Decrypt ediliyor…");
+          NSString *dir = [[DDCore dumpsPath] stringByAppendingPathComponent:@"Decrypted"];
+          dispatch_async([DDCore dumpQueue], ^{
+            NSError *derr = nil;
+            NSString *out = [DDImageDumper decryptFilePath:e.path toDirectory:dir error:&derr];
+            dispatch_async(dispatch_get_main_queue(), ^{
+              DDHideProgress();
+              if (out) DDResultPanel(@"🔓 Decrypt edildi", out);
+              else DDAlert(@"Decrypt", derr.localizedDescription ?: @"Başarısız");
+            });
+          });
+          return;
+        }
+        i++;
+      }
       if (idx == i) { DDPreviewVC *vc = [[DDPreviewVC alloc] initWithFile:e.path]; [ws.navigationController pushViewController:vc animated:YES]; return; } i++;
       if (idx == i) { DDEditorVC *vc = [[DDEditorVC alloc] initWithFile:e.path]; [ws.navigationController pushViewController:vc animated:YES]; return; } i++;
       if (idx == i) { DDHexEditorVC *vc = [[DDHexEditorVC alloc] initWithFile:e.path]; [ws.navigationController pushViewController:vc animated:YES]; return; } i++;
@@ -1094,6 +1129,8 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
       @{@"icon": @"🔐", @"title": @"AKILLI DECRYPT & IPA", @"sub": @"Decrypted ikili + strings + class-dump + yeniden imzalanabilir IPA"},
       @{@"icon": @"💾", @"title": @"TAM DUMP", @"sub": @"Bundle + şifresi çözülmüş ikililer + raporlar → ZIP"},
       @{@"icon": @"📦", @"title": @"Dump Çıktıları", @"sub": @"Üretilen ZIP/IPA/klasörler — buradan paylaş veya kaydet"},
+      @{@"icon": @"🔓", @"title": @"TÜM İKİLİLERİ DECRYPT ET", @"sub": @"Ana ikili + tüm framework/plugin/dylib → tek klasör, hepsi şifresiz"},
+      @{@"icon": @"🧬", @"title": @"IL2CPP DUMP (Unity)", @"sub": @"dump.cs + methods.json + strings.txt + metadata — canlı adreslerle"},
     ],
     @[
       @{@"icon": @"⚙️", @"title": @"Ayarlar", @"sub": @"Yakalama, günlük, ağ, ZIP, IPA"},
@@ -1274,12 +1311,79 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
         case 0: [self startSmartDump]; break;
         case 1: [self startFullDump]; break;
         case 2: [self pushBrowser:[DDCore dumpsPath]]; break;
+        case 3: [self startDecryptAll]; break;
+        case 4: [self startIl2CppDump]; break;
       }
       break;
     case 6:
       [nav pushViewController:[DDSettingsVC new] animated:YES];
       break;
   }
+}
+
+- (void)startDecryptAll {
+  DDConfirmPanel(@"🔓 Tüm İkilileri Decrypt Et",
+                 @"Ana ikili + oyunun tüm framework/dylib/plugin'leri "
+                 @"bellekten ŞİFRESİZ olarak dump edilir.\n\n"
+                 @"IDA / Ghidra / Hopper'da doğrudan açılır.",
+                 @[@"🔓 BAŞLAT", @"Vazgeç"], 0, ^(NSInteger idx) {
+    if (idx != 0) return;
+    NSString *dir = [[[DDCore dumpsPath] stringByAppendingPathComponent:@"DecryptAll"]
+                     stringByAppendingPathComponent:[DDCore timestampForFilename]];
+    DDShowProgressCancellable(@"🔓 Tüm ikililer decrypt ediliyor", ^{
+      [DDImageDumper cancelDecryptAll];
+    });
+    [DDImageDumper decryptAllAppImagesTo:dir
+                                progress:^(NSString *m) { DDUpdateProgress(m); }
+                              completion:^(NSUInteger decrypted, NSUInteger copied,
+                                           NSUInteger skipped, NSUInteger failed,
+                                           NSString *outDir) {
+      DDHideProgress();
+      NSString *msg = [NSString stringWithFormat:
+          @"🔓 Bellekten decrypt: %lu\n📁 Zaten şifresiz (kopyalandı): %lu\n"
+          @"⏭ Yüklenmedi+şifreli (atılandı): %lu\n❌ Başarısız: %lu",
+          (unsigned long)decrypted, (unsigned long)copied,
+          (unsigned long)skipped, (unsigned long)failed];
+      DDLog(@"🔓 DecryptAll bitti: %@", msg);
+      DDAlert(@"Tamamlandı", msg);
+      DDResultPanel(@"🔓 Decrypt edilen ikililer", outDir);
+    }];
+  });
+}
+
+- (void)startIl2CppDump {
+  NSString *hint = [DDIl2Cpp runtimeAvailable]
+      ? @"Unity IL2CPP runtime bulundu — tam dump yapılabilir."
+      : ([DDIl2Cpp metadataPath]
+            ? @"Runtime görünmüyor ama global-metadata.dat bulundu."
+            : @"Unity/IL2CPP izi bulunamadı (native oyun olabilir).");
+  DDConfirmPanel(@"🧬 IL2CPP Dump",
+                 [NSString stringWithFormat:
+                    @"Üretilecekler:\n\n"
+                     @"• dump.cs — tüm sınıf/alan/yöntemler (canlı VA)\n"
+                     @"• methods.json — adres + imza listesi\n"
+                     @"• strings.txt — tüm string literal'ler\n"
+                     @"• global-metadata.dat kopyası + analiz\n"
+                     @"• IL2CPP motorunun decrypt edilmiş ikilisi\n\n%@", hint],
+                 @[@"🧬 BAŞLAT", @"Vazgeç"], 0, ^(NSInteger idx) {
+    if (idx != 0) return;
+    NSString *dir = [[[DDCore dumpsPath] stringByAppendingPathComponent:@"IL2CPP"]
+                     stringByAppendingPathComponent:[DDCore timestampForFilename]];
+    DDShowProgressCancellable(@"🧬 IL2CPP dump", ^{
+      [DDIl2Cpp cancel];
+    });
+    [DDIl2Cpp dumpTo:dir
+             progress:^(NSString *m) { DDUpdateProgress(m); }
+           completion:^(NSString *summary, NSError *err) {
+      DDHideProgress();
+      if (err) {
+        DDAlert(@"IL2CPP Dump", err.localizedDescription);
+      } else {
+        if (summary) DDAlert(@"IL2CPP Dump", summary);
+        DDResultPanel(@"🧬 IL2CPP dump hazır", dir);
+      }
+    }];
+  });
 }
 
 - (void)startSmartDump {

@@ -40,6 +40,32 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable NSString *)dumpMainExecutableToDirectory:(NSString *)directory
                                                error:(NSError **)error;
 
+/// Dosya Mach-O mu (thin/fat, her mimari)? Hızlı magic kontrolü.
++ (BOOL)isMachOFile:(NSString *)path;
+
+/// Mach-O için insan-okur özet: "Mach-O arm64 • App Store şifreli (cryptid=1)"
++ (nullable NSString *)machoSummaryForPath:(NSString *)path;
+
+/**
+ * DOSYA YOLU bazlı decrypt (browse sırasında): dosya yüklü bir görüntüye
+ * denk geliyorsa bellekten ŞİFRESİZ kopyasını üretir; yüklenmemişse
+ * cryptid==0 ise thin kopya çıkarır, cryptid==1 ise açıklayıcı hata döner.
+ */
++ (nullable NSString *)decryptFilePath:(NSString *)path
+                           toDirectory:(NSString *)directory
+                                  error:(NSError **)error;
+
+/// Uygulamaya AİT TÜM ikilileri (ana + framework + plugin) decrypt edip
+/// klasöre yazar. Yüklenmemiş ama zaten şifresiz olanlar kopyalanır.
++ (void)decryptAllAppImagesTo:(NSString *)directory
+                     progress:(void (^)(NSString *msg))prog
+                   completion:(void (^)(NSUInteger decrypted, NSUInteger copied,
+                                        NSUInteger skipped, NSUInteger failed,
+                                        NSString *outDir))done;
+
+/// decryptAll iptali (HUD İptal düğmesi)
++ (void)cancelDecryptAll;
+
 @end
 
 NS_ASSUME_NONNULL_END

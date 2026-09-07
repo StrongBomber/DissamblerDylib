@@ -9,6 +9,16 @@ CydiaSubstrate / ElleKit **gerekmez** — hook'lar [fishhook](https://github.com
 
 ---
 
+## 🧬 v2.4 — İKİLİ DECRYPT MOTORU + IL2CPP DUMP (iGameGod'dan güçlü)
+
+| Yenilik | Ne yapar |
+|---|---|
+| **🔓 TÜM İKİLİLERİ DECRYPT ET** | Ana ikili + oyunun TÜM framework/dylib/plugin'leri bellekten şifresiz dump edilir → tek klasör, IDA/Ghidra'da doğrudan açılır. Yüklenmemiş ama zaten şifresiz olanlar da kopyalanır |
+| **🧬 IL2CPP DUMP (Unity)** | Oyunun kendi il2cpp runtime'ını süreç içinden sorgular: **dump.cs** (tüm sınıf/alan/yöntemler + canlı VA adresleri), **methods.json** (araç uyumlu adres+imza listesi), **strings.txt** (tüm string literal'ler), **global-metadata.dat** kopyası + analiz, IL2CPP motorunun **decrypt edilmiş ikilisi** |
+| Statik Il2CppDumper'dan farkı | Metadata şifrelenmiş olsa bile çalışır (runtime zaten çözmüş durumda) ve adresler GERÇEK çalışma anı adresleridir |
+| **Browse sırasında decrypt** | Dosya tarayıcıda herhangi bir Mach-O'ya uzun bas → **🔓 Decrypt edilmiş kaydet**. Yüklü+şifreli ise bellekten çözülür; önizlemede cryptid/arm64 durumu gösterilir |
+| Klasör paylaşımı | Sonuç panelinde klasör paylaşılırsa otomatik ZIP'lenir |
+
 ## 🔥 v2.3 — "çalışıyor mu bilemiyorum" bitti: Durum panosu + iGameGod/Filza akışları
 
 | Yenilik | Ne yapar |

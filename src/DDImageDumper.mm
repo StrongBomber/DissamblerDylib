@@ -12,6 +12,8 @@
 //
 
 #import "DDImageDumper.h"
+
+#include <atomic>
 #import "DDCore.h"
 
 #import <dlfcn.h>
@@ -328,6 +330,230 @@ static BOOL dd_find_arm64_slice(const uint8_t *data, size_t len, uint32_t *off, 
     return nil;
   }
   return [DDImageDumper dumpImage:main toDirectory:directory error:error];
+}
+
+#pragma mark - Dosya bazlı decrypt (browse desteği)
+
+static std::atomic<bool> dd_da_cancel{false};
++ (void)cancelDecryptAll { dd_da_cancel = true; }
+
++ (BOOL)isMachOFile:(NSString *)path {
+  NSFileHandle *h = [NSFileHandle fileHandleForReadingAtPath:path];
+  if (!h) return NO;
+  NSData *d = [h readDataOfLength:4];
+  [h closeFile];
+  if (d.length < 4) return NO;
+  uint32_t m;
+  memcpy(&m, d.bytes, 4);
+  return (m == MH_MAGIC_64 || m == MH_MAGIC || m == FAT_MAGIC || m == FAT_CIGAM);
+}
+
+/// Diskteki dosyadan cryptid oku (load command'lar baştadır, 64KB yeter)
+static BOOL dd_disk_cryptid(NSString *path, uint32_t *cryptid, BOOL *isArm64) {
+  *cryptid = 0; *isArm64 = NO;
+  FILE *f = fopen(path.UTF8String, "rb");
+  if (!f) return NO;
+  uint8_t hdr[4096];
+  size_t got = fread(hdr, 1, sizeof(hdr), f);
+  fclose(f);
+  if (got < 32) return NO;
+
+  const uint8_t *base = hdr;
+  size_t baseLen = got;
+  uint32_t magic;
+  memcpy(&magic, hdr, 4);
+
+  uint32_t off = 0;
+  if (magic == FAT_MAGIC || magic == FAT_CIGAM) {
+    // fat_header: magic(4) nfat_arch(4); arch: cputype cpusub offset size align (20B)
+    uint32_t nfat;
+    memcpy(&nfat, hdr + 4, 4);
+    if (magic == FAT_CIGAM) nfat = CFSwapInt32(nfat);
+    if (nfat == 0 || nfat > 32) return NO;
+    BOOL found = NO;
+    for (uint32_t i = 0; i < nfat && 8 + (i + 1) * 20 <= got; i++) {
+      uint32_t cput, coff;
+      memcpy(&cput, hdr + 8 + i * 20, 4);
+      memcpy(&coff, hdr + 8 + i * 20 + 8, 4);
+      if (magic == FAT_CIGAM) { cput = CFSwapInt32(cput); coff = CFSwapInt32(coff); }
+      if (cput == CPU_TYPE_ARM64) { off = coff; found = YES; break; }
+    }
+    if (!found) return NO;
+    base = hdr + off;
+    baseLen = got - off;
+    if (baseLen < 32) return NO; // slice load command'ları 4KB içinde olmayabilir
+  }
+
+  uint32_t m;
+  memcpy(&m, base, 4);
+  if (m != MH_MAGIC_64) return NO;
+  *isArm64 = YES;
+  uint32_t ncmds, sizeofcmds;
+  memcpy(&ncmds, base + 16, 4);
+  memcpy(&sizeofcmds, base + 20, 4);
+  if (sizeofcmds == 0 || sizeofcmds > baseLen - 32) return NO;
+
+  const uint8_t *p = base + 32;
+  uint32_t cur = 0;
+  while (cur + 8 <= sizeofcmds) {
+    uint32_t cmd, csz;
+    memcpy(&cmd, p + cur, 4);
+    memcpy(&csz, p + cur + 4, 4);
+    if (csz < 8 || cur + csz > sizeofcmds) break;
+    if (cmd == LC_ENCRYPTION_INFO_64) {
+      uint32_t cid;
+      memcpy(&cid, p + cur + 16, 4); // cmd(4) cmdsize(4) cryptoff(4) cryptsize(4) cryptid(4)
+      *cryptid = cid;
+      return YES;
+    }
+    cur += csz;
+  }
+  return NO; // encryption info yok = şifresiz
+}
+
++ (nullable NSString *)machoSummaryForPath:(NSString *)path {
+  if (![DDImageDumper isMachOFile:path]) return nil;
+  NSFileHandle *h = [NSFileHandle fileHandleForReadingAtPath:path];
+  if (!h) return nil;
+  NSData *d = [h readDataOfLength:4];
+  [h closeFile];
+  uint32_t m;
+  memcpy(&m, d.bytes, 4);
+  NSString *kind = (m == FAT_MAGIC || m == FAT_CIGAM) ? @"Universal (fat) ikili" : @"Mach-O thin";
+
+  uint32_t cryptid = 0;
+  BOOL isArm64 = NO;
+  BOOL found = dd_disk_cryptid(path, &cryptid, &isArm64);
+  NSString *enc = @"şifresiz";
+  if (found && cryptid != 0) enc = @"App Store şifreli (cryptid=1)";
+  else if (!found) enc = @"şifresiz (encryption info yok)";
+  return [NSString stringWithFormat:@"%@ %@ • %@", kind, isArm64 ? @"arm64" : @"?", enc];
+}
+
++ (nullable NSString *)decryptFilePath:(NSString *)path
+                           toDirectory:(NSString *)directory
+                                  error:(NSError **)error {
+  DD_GUARD_CURRENT_BLOCK;
+  // 1) Yüklü görüntü mü? → bellekten decrypt (en güçlü yol)
+  for (DDLoadedImage *img in [DDImageDumper loadedImages]) {
+    if ([img.path isEqualToString:path]) {
+      return [DDImageDumper dumpImage:img toDirectory:directory error:error];
+    }
+  }
+  // 2) Diskten cryptid kontrolü
+  uint32_t cryptid = 0;
+  BOOL isArm64 = NO;
+  BOOL found = dd_disk_cryptid(path, &cryptid, &isArm64);
+  if (found && cryptid != 0) {
+    if (error) *error = [NSError errorWithDomain:@"DDumper" code:-20
+                                   userInfo:@{NSLocalizedDescriptionKey :
+        @"Bu ikili ŞİFRELİ ama şu anda yüklü değil — şifre yalnız işletim "
+        @"sistemi onu ÇALIŞTIRIRKEN çözülür. Oyunda bu kodun yüklendiği andan "
+        @"sonra tekrar deneyin."}];
+    return nil;
+  }
+  // 3) Şifresiz: thin-arm64 kopya üret
+  NSData *fileData = [NSData dataWithContentsOfFile:path];
+  if (!fileData) {
+    if (error) *error = [NSError errorWithDomain:@"DDumper" code:-21
+                                   userInfo:@{NSLocalizedDescriptionKey : @"Dosya okunamadı"}];
+    return nil;
+  }
+  uint32_t sliceOff = 0, sliceSize = 0;
+  if (dd_find_arm64_slice((const uint8_t *)fileData.bytes, fileData.length, &sliceOff, &sliceSize)) {
+    NSData *slice = [fileData subdataWithRange:NSMakeRange(sliceOff, sliceSize)];
+    [[NSFileManager defaultManager] createDirectoryAtPath:directory
+                              withIntermediateDirectories:YES attributes:nil error:nil];
+    NSString *out = [directory stringByAppendingPathComponent:
+        [NSString stringWithFormat:@"%@", path.lastPathComponent]];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:out]) {
+      [[NSFileManager defaultManager] removeItemAtPath:out error:nil];
+    }
+    if ([slice writeToFile:out options:NSDataWritingAtomic error:error]) return out;
+    return nil;
+  }
+  // arm64 slice yok ama dosya Mach-O: olduğu gibi kopyala
+  NSString *out2 = [directory stringByAppendingPathComponent:path.lastPathComponent];
+  [[NSFileManager defaultManager] createDirectoryAtPath:directory
+                            withIntermediateDirectories:YES attributes:nil error:nil];
+  if ([fileData writeToFile:out2 options:NSDataWritingAtomic error:error]) return out2;
+  return nil;
+}
+
++ (void)decryptAllAppImagesTo:(NSString *)directory
+                     progress:(void (^)(NSString *))prog
+                   completion:(void (^)(NSUInteger, NSUInteger, NSUInteger, NSUInteger, NSString *))done {
+  dispatch_async([DDCore dumpQueue], ^{
+    DD_GUARD_CURRENT_BLOCK;
+    dd_da_cancel = false;
+
+    void (^P)(NSString *) = ^(NSString *m) {
+      dispatch_async(dispatch_get_main_queue(), ^{ prog(m); });
+    };
+
+    NSFileManager *fm = [[NSFileManager alloc] init];
+    [fm createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:nil];
+    NSString *bundle = [DDCore bundlePath];
+
+    NSUInteger decrypted = 0, copied = 0, skipped = 0, failed = 0;
+
+    // ── 1) Yüklü olan TÜM uygulama ikilileri (bellekten decrypt) ──
+    NSMutableArray<NSString *> *done2 = [NSMutableArray array];
+    for (DDLoadedImage *img in [DDImageDumper loadedImages]) {
+      if (dd_da_cancel.load()) break;
+      if (![img.path hasPrefix:bundle]) continue; // sistem kütüphanelerini atla
+      if ([done2 containsObject:img.path]) continue;
+      [done2 addObject:img.path];
+      P([NSString stringWithFormat:@"🔓 %@", img.name]);
+      NSError *e = nil;
+      NSString *out = [DDImageDumper dumpImage:img toDirectory:directory error:&e];
+      if (out) {
+        if ([out.lastPathComponent containsString:@"_decrypted"]) decrypted++;
+        else copied++;
+      } else {
+        failed++;
+        DDLog(@"⚠️ Decrypt başarısız %@: %@", img.name, e.localizedDescription);
+      }
+    }
+
+    // ── 2) Bundle'daki ama yüklenmemiş ikililer ──
+    if (!dd_da_cancel.load()) {
+      P(@"📁 Bundle taranıyor…");
+      NSDirectoryEnumerator *en = [fm enumeratorAtPath:bundle];
+      NSString *rel;
+      long looked = 0;
+      while ((rel = [en nextObject]) && !dd_da_cancel.load()) {
+        if (++looked > 100000) break;
+        NSString *full = [bundle stringByAppendingPathComponent:rel];
+        if ([done2 containsObject:full]) continue;
+        NSString *n = rel.lowercaseString;
+        // ilgilenmediğimiz kaynakları atla (hız)
+        if ([n hasSuffix:@".car"] || [n hasSuffix:@".png"] || [n hasSuffix:@".jpg"] ||
+            [n hasSuffix:@".nib"] || [n hasSuffix:@".lproj"] || [n hasSuffix:@".strings"] ||
+            [n hasSuffix:@".ttf"] || [n hasSuffix:@".otf"] || [n hasSuffix:@".mp3"] ||
+            [n hasSuffix:@".ogg"] || [n hasSuffix:@".wav"] || [n hasSuffix:@".mp4"] ||
+            [n hasSuffix:@".caf"] || [n hasSuffix:@".m4a"] || [n hasSuffix:@".plist"]) continue;
+        if (![DDImageDumper isMachOFile:full]) continue;
+
+        uint32_t cryptid = 0;
+        BOOL isArm64 = NO;
+        BOOL found = dd_disk_cryptid(full, &cryptid, &isArm64);
+        if (found && cryptid != 0) {
+          skipped++; // yüklü değil + şifreli → şu an çözülemez
+          continue;
+        }
+        // şifresiz → kopyala
+        NSError *e = nil;
+        NSString *out = [DDImageDumper decryptFilePath:full toDirectory:directory error:&e];
+        if (out) copied++; else failed++;
+      }
+    }
+
+    NSString *dirCopy = [directory copy];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      done(decrypted, copied, skipped, failed, dirCopy);
+    });
+  });
 }
 
 @end
