@@ -1238,7 +1238,7 @@ static void dd_open_gg(lua_State *L) {
 
 #pragma mark - Script listesi ekranı
 
-@interface DDScriptsVC ()
+@interface DDScriptsVC () <UITableViewDataSource, UITableViewDelegate>
 @property (nonatomic, strong) UITableView *table;
 @property (nonatomic, strong) NSMutableArray<NSString *> *files;
 @end
