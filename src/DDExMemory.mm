@@ -168,6 +168,7 @@ static NSArray<NSNumber *> *DDMemScan(const void *pattern, NSUInteger patSize,
         }
       }
       free(buf);
+      if (DDMemScanCancelled()) { return out; }  // kullanıcı iptal etti
       if (kr != KERN_SUCCESS) break;
       uint64_t adv = MIN(remaining, chunk);
       off += adv;
@@ -324,6 +325,10 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
   self.filterBtn.enabled = NO;
   self.status.text = @"Bölgeler toplanıyor…";
   [DDMemoryScan resetCancel];
+  DDShowProgressCancellable(@"🧠 Bellek taranıyor", ^{
+    [DDMemoryScan cancel];
+  });
+  DDUpdateProgress(@"Bölgeler toplanıyor…");
 
   NSArray<NSNumber *> *prevAddrs = [self.addresses copy];
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
@@ -374,6 +379,7 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
 }
 
 - (void)finishScan:(NSArray<NSNumber *> *)result scanned:(uint64_t)scanned total:(uint64_t)total {
+  DDHideProgress();
   self.addresses = [result mutableCopy];
   self.scanning = NO;
   self.searchBtn.enabled = YES;
@@ -485,6 +491,7 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
 #pragma mark - Tarama iptali
 
 static std::atomic<bool> dd_memscan_cancel{false};
+static BOOL DDMemScanCancelled(void) { return dd_memscan_cancel.load(); }
 
 @implementation DDMemoryScan
 + (void)resetCancel { dd_memscan_cancel = false; }

@@ -9,6 +9,22 @@ CydiaSubstrate / ElleKit **gerekmez** — hook'lar [fishhook](https://github.com
 
 ---
 
+## 🚑 v2.1 — "dump edilemiyor / lag / UI" kökten çözüldü
+
+| Sorun | Kök neden | Çözüm |
+|---|---|---|
+| **Dump edilemiyordu** | ZIP yazıcısında CRC değeri **yanlış dosya ofsetine** yazılıyordu → üretilen her ZIP/İPA bozuktu | CRC ofseti düzeltildi; artık tüm ZIP/IPA'lar doğrulanabilir |
+| **"Ana ikili dump edilemedi"** | Ana ikili tespiti `realpath` karşılaştırmasıyla yapılıyordu; `/private/var` ≠ `/var` gibi farklar tespiti bozuyordu | dyld görüntü listesinde **indeks 0 = ana ikili** garantisi kullanılıyor |
+| **Dump yarıda kalıyordu** | `NSFileManager` toplu kopyası tek bir okunamayan dosyada TÜM kopyayı durduruyordu | Yeni **hata toleranslı kopyalayıcı**: bozuk dosya atlanır ve raporlanır, sembolik bağlar korunur |
+| **Yetersiz disk sessiz kalıyordu** | Ön kontrol yoktu | Dump başlamadan **disk alanı kontrolü** ve net uyarı |
+| **Lag** | Her `open()` çağrısında `NSUserDefaults` okunuyordu (ağır kilit + CFPreferences) | Ayarlar **C seviyesi atomik önbelleğe** alındı (3 sn'de bir yenilenir) |
+| **Lag (yoğun oyunlar)** | Her dosya olayı için async görev → kuyruk şişmesi | **Olay seli kısıtlama**: 512 bekleme limiti, aşarsa düşür + raporla |
+| **Dump sırasında konsol donuyordu** | Dump ve log aynı kuyruğu paylaşıyordu | Dump artık **ayrı kuyrukta**; konsol akmaya devam eder |
+| **Klavye çalışmıyordu** | Menü penceresi `keyWindow` yapılmıyordu | Panel açıkken pencere key yapılır, kapanınca oyununkine dönülür |
+| **Alert'ler görünmüyor/patlıyordu** | Oyunun view hiyerarşisinde sunum yapılıyordu | **Kendi panel sistemi**: tüm uyarı/giriş/ilerlemeler DDumper'ın penceresinde |
+| **Dump iptal edilemiyordu** | İptal mekanizması yoktu | HUD'da **İptal** düğmesi (tam dump, akıllı dump, bellek taraması) |
+| **İlerleme belirsizdi** | Sadece "çalışıyor…" yazıyordu | Gerçek **% ilerleme** (dosya sayacı) tüm aşamalarda |
+
 ## 🆕 v2'de gelenler
 
 | Özellik | Ne yapar |
