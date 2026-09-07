@@ -1,0 +1,101 @@
+SDK: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk
+→ fishhook derleniyor (C)…
+→ DDumper derleniyor (Objective-C++)…
+src/DDHooks.mm:60:7: error: use of undeclared identifier 'dd_c_home_len'
+  if (dd_c_home_len == 0 || strncmp(path, dd_c_home, dd_c_home_len) != 0) return path;
+      ^
+src/DDHooks.mm:60:43: error: use of undeclared identifier 'dd_c_home'
+  if (dd_c_home_len == 0 || strncmp(path, dd_c_home, dd_c_home_len) != 0) return path;
+                                          ^
+src/DDHooks.mm:60:54: error: use of undeclared identifier 'dd_c_home_len'
+  if (dd_c_home_len == 0 || strncmp(path, dd_c_home, dd_c_home_len) != 0) return path;
+                                                     ^
+3 errors generated.
+src/DDUICommon.mm:24:10: warning: 'UIScene' is only available on iOS 13.0 or newer [-Wunguarded-availability-new]
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+         ^~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIScene.h:20:12: note: 'UIScene' has been marked as being introduced in iOS 13.0 here, but the deployment target is iOS 12.0.0
+@interface UIScene : UIResponder
+           ^
+src/DDUICommon.mm:24:10: note: enclose 'UIScene' in an @available check to silence this warning
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+         ^~~~~~~
+src/DDUICommon.mm:24:62: warning: 'connectedScenes' is only available on iOS 13.0 or newer [-Wunguarded-availability-new]
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+                                                             ^~~~~~~~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIApplication.h:169:50: note: 'connectedScenes' has been marked as being introduced in iOS 13.0 here, but the deployment target is iOS 12.0.0
+@property(nonatomic, readonly) NSSet<UIScene *> *connectedScenes API_AVAILABLE(ios(13.0));
+                                                 ^
+src/DDUICommon.mm:24:62: note: enclose 'connectedScenes' in an @available check to silence this warning
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+                                                             ^~~~~~~~~~~~~~~
+src/DDUICommon.mm:25:33: warning: 'UIWindowScene' is only available on iOS 13.0 or newer [-Wunguarded-availability-new]
+      if ([scene isKindOfClass:[UIWindowScene class]]) {
+                                ^~~~~~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIWindowScene.h:19:12: note: 'UIWindowScene' has been marked as being introduced in iOS 13.0 here, but the deployment target is iOS 12.0.0
+@interface UIWindowScene : UIScene
+           ^
+src/DDUICommon.mm:25:33: note: enclose 'UIWindowScene' in an @available check to silence this warning
+      if ([scene isKindOfClass:[UIWindowScene class]]) {
+                                ^~~~~~~~~~~~~
+src/DDUICommon.mm:26:9: warning: 'UIWindowScene' is only available on iOS 13.0 or newer [-Wunguarded-availability-new]
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        ^~~~~~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIWindowScene.h:19:12: note: 'UIWindowScene' has been marked as being introduced in iOS 13.0 here, but the deployment target is iOS 12.0.0
+@interface UIWindowScene : UIScene
+           ^
+src/DDUICommon.mm:26:9: note: enclose 'UIWindowScene' in an @available check to silence this warning
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        ^~~~~~~~~~~~~
+src/DDUICommon.mm:26:30: warning: 'UIWindowScene' is only available on iOS 13.0 or newer [-Wunguarded-availability-new]
+        UIWindowScene *ws = (UIWindowScene *)scene;
+                             ^~~~~~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIWindowScene.h:19:12: note: 'UIWindowScene' has been marked as being introduced in iOS 13.0 here, but the deployment target is iOS 12.0.0
+@interface UIWindowScene : UIScene
+           ^
+src/DDUICommon.mm:26:30: note: enclose 'UIWindowScene' in an @available check to silence this warning
+        UIWindowScene *ws = (UIWindowScene *)scene;
+                             ^~~~~~~~~~~~~
+src/DDUICommon.mm:27:16: warning: 'keyWindow' is only available on iOS 15.0 or newer [-Wunguarded-availability-new]
+        if (ws.keyWindow.rootViewController) {
+               ^~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIWindowScene.h:41:61: note: 'keyWindow' has been marked as being introduced in iOS 15.0 here, but the deployment target is iOS 12.0.0
+@property (nonatomic, readonly, strong, nullable) UIWindow *keyWindow API_AVAILABLE(ios(15.0));
+                                                            ^
+src/DDUICommon.mm:27:16: note: enclose 'keyWindow' in an @available check to silence this warning
+        if (ws.keyWindow.rootViewController) {
+               ^~~~~~~~~
+src/DDUICommon.mm:28:19: warning: 'keyWindow' is only available on iOS 15.0 or newer [-Wunguarded-availability-new]
+          vc = ws.keyWindow.rootViewController;
+                  ^~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIWindowScene.h:41:61: note: 'keyWindow' has been marked as being introduced in iOS 15.0 here, but the deployment target is iOS 12.0.0
+@property (nonatomic, readonly, strong, nullable) UIWindow *keyWindow API_AVAILABLE(ios(15.0));
+                                                            ^
+src/DDUICommon.mm:28:19: note: enclose 'keyWindow' in an @available check to silence this warning
+          vc = ws.keyWindow.rootViewController;
+                  ^~~~~~~~~
+7 warnings generated.
+src/DDExMemory.mm:335:25: error: cannot refer to declaration with an array type inside block
+            memcmp(cur, pat, patSize) == 0) {
+                        ^
+src/DDExMemory.mm:313:11: note: 'pat' declared here
+  uint8_t pat[8];
+          ^
+1 error generated.
+src/DDExDefaults.mm:93:94: error: unexpected type name 'id': expected expression
+    cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue2 reuseIdentifier:id];
+                                                                                             ^
+1 error generated.
+src/DDUI.mm:37:1: error: duplicate interface definition for class 'DDPreviewVC'
+@interface DDPreviewVC : UIViewController <UIScrollViewDelegate>
+^
+src/DDFeatures.h:12:12: note: previous definition is here
+@interface DDPreviewVC : UIViewController
+           ^
+src/DDUI.mm:48:13: error: use of undeclared identifier '_filePath'
+  if (self) _filePath = [path copy];
+            ^
+src/DDOverride.h:34:53: note: passing argument to parameter 'originalPath' here
++ (nullable NSString *)effectivePathFor:(NSString *)originalPath;
+                                                    ^
+2 errors generated.
