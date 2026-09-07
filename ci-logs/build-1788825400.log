@@ -1,0 +1,73 @@
+SDK: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk
+→ fishhook derleniyor (C)…
+→ Lua 5.3.6 indiriliyor…
+  kaynak: https://www.lua.org/ftp/lua-5.3.6.tar.gz
+  kaynak: /tmp/lua_x/lua-5.3.6/src/
+→ Lua derleniyor (C)…
+→ DDumper derleniyor (Objective-C++)…
+src/DDImageDumper.mm:197:13: warning: variable 'mainExec' set but not used [-Wunused-but-set-variable]
+  NSString *mainExec = nil;
+            ^
+1 warning generated.
+src/DDUICommon.mm:58:49: warning: 'initForExportingURLs:asCopy:' is only available on iOS 14.0 or newer [-Wunguarded-availability-new]
+        [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url]
+                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIDocumentPickerViewController.h:60:1: note: 'initForExportingURLs:asCopy:' has been marked as being introduced in iOS 14.0 here, but the deployment target is iOS 12.0.0
+- (instancetype)initForExportingURLs:(NSArray <NSURL *> *)urls asCopy:(BOOL)asCopy NS_DESIGNATED_INITIALIZER API_AVAILABLE(ios(14.0)) API_UNAVAILABLE(tvos);
+^
+src/DDUICommon.mm:58:49: note: enclose 'initForExportingURLs:asCopy:' in an @available check to silence this warning
+        [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url]
+                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+src/DDPanels.mm:54:17: warning: unused function 'DDPanelBg' [-Wunused-function]
+static UIColor *DDPanelBg(void)   { return [UIColor colorWithWhite:0.07 alpha:0.97]; }
+                ^
+1 warning generated.
+src/DDIl2Cpp.mm:514:9: warning: format specifies type 'char *' but the argument has type 'NSString *' [-Wformat]
+        runtime ? @"" : @" (runtime yok — sadece metadata)",
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/DDIl2Cpp.mm:516:9: warning: format specifies type 'char *' but the argument has type 'NSString *' [-Wformat]
+        metaNote ? [NSString stringWithFormat:@" (%@)", metaNote] : @"",
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2 warnings generated.
+src/DDScript.mm:192:22: error: use of undeclared identifier 'mach_vm_read_overwrite'; did you mean 'vm_read_overwrite'?
+  kern_return_t kr = mach_vm_read_overwrite(mach_task_self(), addr, len,
+                     ^~~~~~~~~~~~~~~~~~~~~~
+                     vm_read_overwrite
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/usr/include/mach/vm_map.h:208:15: note: 'vm_read_overwrite' declared here
+kern_return_t vm_read_overwrite
+              ^
+src/DDScript.mm:193:69: error: cannot initialize a parameter of type 'vm_size_t *' (aka 'unsigned long *') with an rvalue of type 'mach_vm_size_t *' (aka 'unsigned long long *')
+                                            (mach_vm_address_t)buf, &got);
+                                                                    ^~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/usr/include/mach/vm_map.h:214:13: note: passing argument to parameter 'outsize' here
+        vm_size_t *outsize
+                   ^
+src/DDScript.mm:271:14: warning: variable 'cur' set but not used [-Wunused-but-set-variable]
+    uint64_t cur = 0;
+             ^
+src/DDScript.mm:447:31: error: property 'UTF8String' not found on object of type 'id'
+      const char *s = vals[i].UTF8String;
+                              ^
+src/DDScript.mm:672:16: warning: variable 'ok' set but not used [-Wunused-but-set-variable]
+    NSUInteger ok = 0;
+               ^
+src/DDScript.mm:1158:1: error: duplicate interface definition for class 'DDScriptConsoleVC'
+@interface DDScriptConsoleVC : UIViewController
+^
+src/DDScript.h:39:12: note: previous definition is here
+@interface DDScriptConsoleVC : UIViewController
+           ^
+src/DDScript.mm:1169:13: error: use of undeclared identifier '_scriptPath'
+  if (self) _scriptPath = [path copy];
+            ^
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIView.h:229:30: note: passing argument to parameter 'view' here
+- (void)addSubview:(UIView *)view;
+                             ^
+src/DDScript.mm:1251:27: error: assigning to 'id<UITableViewDataSource> _Nullable' from incompatible type 'DDScriptsVC *const __strong'
+  self.table.dataSource = self;
+                          ^~~~
+src/DDScript.mm:1252:25: error: assigning to 'id<UITableViewDelegate> _Nullable' from incompatible type 'DDScriptsVC *const __strong'
+  self.table.delegate = self;
+                        ^~~~
+2 warnings and 7 errors generated.
