@@ -1,0 +1,34 @@
+SDK: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk
+→ fishhook derleniyor (C)…
+→ DDumper derleniyor (Objective-C++)…
+src/DDImageDumper.mm:195:13: warning: variable 'mainExec' set but not used [-Wunused-but-set-variable]
+  NSString *mainExec = nil;
+            ^
+1 warning generated.
+src/DDUICommon.mm:58:49: warning: 'initForExportingURLs:asCopy:' is only available on iOS 14.0 or newer [-Wunguarded-availability-new]
+        [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url]
+                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIDocumentPickerViewController.h:60:1: note: 'initForExportingURLs:asCopy:' has been marked as being introduced in iOS 14.0 here, but the deployment target is iOS 12.0.0
+- (instancetype)initForExportingURLs:(NSArray <NSURL *> *)urls asCopy:(BOOL)asCopy NS_DESIGNATED_INITIALIZER API_AVAILABLE(ios(14.0)) API_UNAVAILABLE(tvos);
+^
+src/DDUICommon.mm:58:49: note: enclose 'initForExportingURLs:asCopy:' in an @available check to silence this warning
+        [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url]
+                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+src/DDPanels.mm:53:17: warning: unused function 'DDPanelBg' [-Wunused-function]
+static UIColor *DDPanelBg(void)   { return [UIColor colorWithWhite:0.07 alpha:0.97]; }
+                ^
+1 warning generated.
+src/DDUI.mm:1572:31: warning: unused variable 'ws' [-Wunused-variable]
+  __weak DDOverlayController *ws = self;
+                              ^
+1 warning generated.
+Undefined symbols for architecture arm64:
+  "_OBJC_CLASS_$_CABasicAnimation", referenced from:
+       in DDUI-6d7cc9.o
+  "_OBJC_CLASS_$_CAMediaTimingFunction", referenced from:
+       in DDUI-6d7cc9.o
+  "_kCAMediaTimingFunctionEaseInEaseOut", referenced from:
+      -[DDOverlayController setupWindow] in DDUI-6d7cc9.o
+ld: symbol(s) not found for architecture arm64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
