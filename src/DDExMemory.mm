@@ -12,7 +12,9 @@
 #import "DDFeatures.h"
 #import "DDCore.h"
 #import "DDUICommon.h"
+#import "DDPanels.h"
 
+#import <atomic>
 #import <dlfcn.h>
 #import <mach/mach.h>
 #import <mach-o/dyld.h>
@@ -321,16 +323,22 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
   self.searchBtn.enabled = NO;
   self.filterBtn.enabled = NO;
   self.status.text = @"Bölgeler toplanıyor…";
+  [DDMemoryScan resetCancel];
 
+  NSArray<NSNumber *> *prevAddrs = [self.addresses copy];
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
     NSArray<DDMemRegion *> *regions = DDMemCollectRegions();
     uint64_t totalBytes = 0;
     for (DDMemRegion *r in regions) totalBytes += r.size;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      self.status.text = [NSString stringWithFormat:@"Taranıyor… %@ bölge",
+                          [DDCore humanSize:totalBytes]];
+    });
 
-    // Önceki adresler varsa ve refine ise yalnız onları kontrol et
     NSMutableArray *result = [NSMutableArray array];
-    if (refine && self.addresses.count > 0) {
-      for (NSNumber *a in self.addresses) {
+    if (refine && prevAddrs.count > 0) {
+      for (NSNumber *a in prevAddrs) {
+        if ([DDMemoryScan isCancelled]) break;
         uint8_t cur[8];
         if (DDMemRead(a.unsignedLongLongValue, cur, patSize) &&
             memcmp(cur, pat, patSize) == 0) {
@@ -340,15 +348,22 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
       }
       free(pat);
       dispatch_async(dispatch_get_main_queue(), ^{
-        [self finishScan:result scanned:self.addresses.count total:totalBytes];
+        [self finishScan:result scanned:prevAddrs.count total:totalBytes];
       });
       return;
     }
 
-    __block volatile NSUInteger foundCount = 0;
+    __block uint64_t lastReport = 0;
     NSArray *found = DDMemScan(pat, patSize, regions, 20000,
-                               ^(uint64_t scanned, NSUInteger found) {
-      foundCount = found;
+                               ^(uint64_t scanned, NSUInteger foundCount) {
+      if (scanned - lastReport >= 32ull * 1024 * 1024) {
+        lastReport = scanned;
+        dispatch_async(dispatch_get_main_queue(), ^{
+          self.status.text = [NSString stringWithFormat:
+                              @"Taranıyor… %@ (%lu sonuç)",
+                              [DDCore humanSize:scanned], (unsigned long)foundCount];
+        });
+      }
     });
     result = [found mutableCopy];
     free(pat);
@@ -436,35 +451,43 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
   [tableView deselectRowAtIndexPath:indexPath animated:YES];
   uint64_t addr = self.addresses[indexPath.row].unsignedLongLongValue;
 
-  UIAlertController *a = [UIAlertController
-      alertControllerWithTitle:[NSString stringWithFormat:@"0x%llX — yeni değer", addr]
-                       message:@"Değişiklik anında belleğe yazılır (poke)."
-                preferredStyle:UIAlertControllerStyleAlert];
-  [a addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-    tf.keyboardType = UIKeyboardTypeNumbersAndPunctuation;
-    NSUInteger size = DDMemTypeSize(self.type);
-    uint8_t cur[8];
-    if (DDMemRead(addr, cur, size)) {
-      if (self.type == DDMemI32) { int32_t v; memcpy(&v, cur, 4); tf.text = [NSString stringWithFormat:@"%d", v]; }
-      else if (self.type == DDMemI64) { int64_t v; memcpy(&v, cur, 8); tf.text = [NSString stringWithFormat:@"%lld", (long long)v]; }
-      else if (self.type == DDMemF32) { float v; memcpy(&v, cur, 4); tf.text = [NSString stringWithFormat:@"%g", v]; }
-      else { double v; memcpy(&v, cur, 8); tf.text = [NSString stringWithFormat:@"%g", v]; }
-    }
-  }];
+  // mevcut değeri oku
+  NSUInteger size = DDMemTypeSize(self.type);
+  uint8_t cur[8];
+  NSString *curStr = @"?";
+  if (DDMemRead(addr, cur, size)) {
+    if (self.type == DDMemI32) { int32_t v; memcpy(&v, cur, 4); curStr = [NSString stringWithFormat:@"%d", v]; }
+    else if (self.type == DDMemI64) { int64_t v; memcpy(&v, cur, 8); curStr = [NSString stringWithFormat:@"%lld", (long long)v]; }
+    else if (self.type == DDMemF32) { float v; memcpy(&v, cur, 4); curStr = [NSString stringWithFormat:@"%g", v]; }
+    else { double v; memcpy(&v, cur, 8); curStr = [NSString stringWithFormat:@"%g", v]; }
+  }
+
   __weak typeof(self) ws = self;
-  [a addAction:[UIAlertAction actionWithTitle:@"Yaz" style:UIAlertActionStyleDefault
-                                    handler:^(UIAlertAction *_) {
-    uint8_t *pat = (uint8_t *)malloc(8);
-    NSUInteger size = DDMemTypeSize(self.type);
-    if (pat && DDMemParseValue(a.textFields.firstObject.text, self.type, pat)) {
-      BOOL ok = DDMemWrite(addr, pat, size);
+  DDInputPanelShow([NSString stringWithFormat:@"0x%llX — yeni değer", addr],
+                   @"Değişiklik anında belleğe yazılır (poke).",
+                   @[@{ @"placeholder": @"yeni değer", @"text": curStr,
+                        @"keyboard": @(UIKeyboardTypeNumbersAndPunctuation) }],
+                   @"Yaz", nil, ^(NSInteger idx, NSArray<NSString *> *values) {
+    if (idx != 1) return;
+    uint8_t pat2[8];
+    if (DDMemParseValue(values.firstObject, ws.type, pat2)) {
+      BOOL ok = DDMemWrite(addr, pat2, size);
       DDLog(ok ? @"🧠 Bellek yazıldı: 0x%llX" : @"⚠️ Bellek yazılamadı: 0x%llX", addr);
+      DDToast(ok ? @"Belleğe yazıldı ✓" : @"Yazılamadı!");
       [ws.table reloadData];
     }
-    free(pat);
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-  [self presentViewController:a animated:YES completion:nil];
+  });
 }
 
+@end
+
+
+#pragma mark - Tarama iptali
+
+static std::atomic<bool> dd_memscan_cancel{false};
+
+@implementation DDMemoryScan
++ (void)resetCancel { dd_memscan_cancel = false; }
++ (void)cancel { dd_memscan_cancel = true; }
++ (BOOL)isCancelled { return dd_memscan_cancel.load(); }
 @end

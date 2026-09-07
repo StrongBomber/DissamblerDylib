@@ -7,6 +7,7 @@
 #import "DDCore.h"
 #import "DDOverride.h"
 #import "DDUICommon.h"
+#import "DDPanels.h"
 
 #include <string.h>
 
@@ -62,6 +63,8 @@ static NSString *DDDisplayName(NSString *originalPath) {
   self.banner.backgroundColor = [UIColor colorWithRed:0.93 green:0.45 blue:0.05 alpha:1.0];
   self.banner.textAlignment = NSTextAlignmentCenter;
   self.banner.numberOfLines = 1;
+
+  [self.view addSubview:self.banner];  // banner layout sırasında konumlanır
 
   self.tv = [[UITextView alloc] initWithFrame:CGRectInset(self.view.bounds, 0, 0)];
   self.tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -385,23 +388,15 @@ static const NSUInteger DDHexRowBytes = 16;
   NSMutableString *cur = [NSMutableString string];
   for (NSUInteger i = 0; i < len; i++) [cur appendFormat:@"%02X", b[i]];
 
-  UIAlertController *a = [UIAlertController
-      alertControllerWithTitle:[NSString stringWithFormat:@"Satırı düzenle (ofset %llX)",
-                                                      (unsigned long long)(self.pageOffset + off)]
-                       message:@"32 hane hex (boşluksuz). Az girersen sona orijinal değerler korunur."
-                preferredStyle:UIAlertControllerStyleAlert];
-  [a addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-    tf.text = cur;
-    tf.keyboardType = UIKeyboardTypeASCIICapable;
-  }];
   __weak typeof(self) ws = self;
-  [a addAction:[UIAlertAction actionWithTitle:@"Uygula" style:UIAlertActionStyleDefault
-                                    handler:^(UIAlertAction *_) {
-    NSString *hex = a.textFields.firstObject.text;
-    [ws applyHex:hex rowOffset:off rowLen:len];
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-  [self presentViewController:a animated:YES completion:nil];
+  DDInputPanelShow([NSString stringWithFormat:@"Satırı düzenle (ofset %llX)",
+                                             (unsigned long long)(self.pageOffset + off)],
+                   @"32 hane hex (boşluksuz). Az girersen sona orijinal değerler korunur.",
+                   @[@{ @"placeholder": @"hex baytları", @"text": cur,
+                        @"keyboard": @(UIKeyboardTypeASCIICapable) }],
+                   @"Uygula", nil, ^(NSInteger idx, NSArray<NSString *> *values) {
+    if (idx == 1) [ws applyHex:values.firstObject rowOffset:off rowLen:len];
+  });
 }
 
 - (void)applyHex:(NSString *)hex rowOffset:(NSUInteger)off rowLen:(NSUInteger)len {
@@ -446,6 +441,11 @@ static const NSUInteger DDHexRowBytes = 16;
                                                     target:self action:@selector(removeAll:)];
 
   [self reload];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self reload];  // düzenlemeden dönünce liste güncellensin
 }
 
 - (void)reload {
@@ -539,17 +539,15 @@ static const NSUInteger DDHexRowBytes = 16;
 }
 
 - (void)removeAll:(id)sender {
-  UIAlertController *a = [UIAlertController
-      alertControllerWithTitle:@"Tümü silinsin mi?"
-                       message:@"Tüm canlı düzenlemeler kaldırılır, oyun orijinalleri okumaya döner."
-                preferredStyle:UIAlertControllerStyleAlert];
-  [a addAction:[UIAlertAction actionWithTitle:@"Sil" style:UIAlertActionStyleDestructive
-                                    handler:^(UIAlertAction *_) {
+  __weak typeof(self) ws = self;
+  DDConfirmPanel(@"Tümü silinsin mi?",
+                 @"Tüm canlı düzenlemeler kaldırılır, oyun orijinalleri okumaya döner.",
+                 @[@"Sil", @"Vazgeç"], 0, ^(NSInteger idx) {
+    if (idx != 0) return;
     [DDOverride removeAll];
-    [self reload];
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-  [self presentViewController:a animated:YES completion:nil];
+    DDToast(@"Canlı düzenlemeler kaldırıldı");
+    [ws reload];
+  });
 }
 
 @end

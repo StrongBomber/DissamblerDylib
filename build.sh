@@ -45,6 +45,7 @@ xcrun -sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" \
   src/DDZipWriter.mm \
   src/DDDumpService.mm \
   src/DDUICommon.mm \
+  src/DDPanels.mm \
   src/DDOverride.mm \
   src/DDExEditor.mm \
   src/DDExAnalyzer.mm \

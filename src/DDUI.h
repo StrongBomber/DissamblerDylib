@@ -12,8 +12,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)shared;
 
-/// Overlay'in sahibi olduğu en üst seviye pencere (menü/paylaşım sunumları için).
+/// Overlay'in sahibi olduğu en üst seviye pencere (ana thread'de; gerekirse oluşturur).
 @property (nonatomic, readonly, nullable) UIWindow *window;
+
+/// Pencereyi oluşturur (idempotent) ve döndürür. Ana thread.
+- (UIWindow *)ensureWindow;
 
 /// Uygulama launch olduktan sonra çağrılır (gecikmeli).
 - (void)showAfterLaunch;

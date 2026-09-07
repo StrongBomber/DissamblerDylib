@@ -10,6 +10,7 @@ NS_ASSUME_NONNULL_BEGIN
 #pragma mark - Önizleme (DDUI.mm içinde, ortak kullanım için burada bildirilir)
 
 @interface DDPreviewVC : UIViewController <UIScrollViewDelegate>
+@property (nonatomic) CGFloat contentTop;   // override banner'ı varsa > 0
 @property (nonatomic, copy) NSString *filePath;
 @property (nonatomic, copy, nullable) NSString *effectivePath; // override aktifse oyunun gördüğü
 @property (nonatomic, strong, nullable) UIScrollView *zoomScroll;
@@ -71,6 +72,13 @@ NSString *DDAllAppClassHeaders(void);
 #pragma mark - Bellek Tarayıcı (DDExMemory.mm)
 
 @interface DDMemoryVC : UIViewController
+@end
+
+/// Bellek taraması iptal API'si
+@interface DDMemoryScan : NSObject
++ (void)resetCancel;
++ (void)cancel;
++ (BOOL)isCancelled;
 @end
 
 #pragma mark - İçerikte Ara (DDExSearch.mm)

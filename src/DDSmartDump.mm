@@ -25,6 +25,7 @@ static NSString *dd_write_text(NSString *path, NSString *text) {
 + (nullable NSString *)buildDecryptedIPAFromBundleCopy:(NSString *)bundleCopyDir
                                             mainBinary:(NSString *)decryptedMainPath
                                                  error:(NSError **)error {
+  // bundleCopyDir: Payload/<App>.app KOPYASININ BULUNDUĞU geçici kök
   DD_GUARD_CURRENT_BLOCK;
   NSFileManager *fm = [[NSFileManager alloc] init];
 
@@ -81,8 +82,10 @@ static NSString *dd_write_text(NSString *path, NSString *text) {
     dispatch_async(dispatch_get_main_queue(), ^{ progress(s); });
   };
 
-  dispatch_async([DDCore ioQueue], ^{
+  // Akıllı dump KENDİ kuyruğunda çalışır (konsol akışı durmaz)
+  dispatch_async([DDCore dumpQueue], ^{
     DD_GUARD_CURRENT_BLOCK;
+    [DDDumpService resetCancel];  // iptal bayrağını temizle
 
     NSString *stamp = [DDCore timestampForFilename];
     NSString *dirName = [NSString stringWithFormat:@"SMART_%@_%@",
@@ -96,6 +99,16 @@ static NSString *dd_write_text(NSString *path, NSString *text) {
     [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
 
     DDLog(@"🧠 Akıllı dump başladı → %@", dir);
+
+    // Disk ön kontrolü (bundle kopyası + IPA)
+    unsigned long long bundleSize = [DDCore folderSize:[DDCore bundlePath]];
+    if ([DDDumpService diskProblemForBytes:bundleSize * 2 + (50ull << 20)]) {
+      NSString *prob = [DDDumpService diskProblemForBytes:bundleSize * 2 + (50ull << 20)];
+      dispatch_async(dispatch_get_main_queue(), ^{ completion(nil, nil,
+          [NSError errorWithDomain:@"DDSmart" code:-11
+                      userInfo:@{NSLocalizedDescriptionKey: prob}]); });
+      return;
+    }
 
     // 1) Ana ikili (decrypted)
     onMain(@"1/6 Ana ikili bellekten çözülüyor…");
@@ -158,7 +171,19 @@ static NSString *dd_write_text(NSString *path, NSString *text) {
       NSString *appCopy = [payload stringByAppendingPathComponent:
                            [[DDCore bundlePath] lastPathComponent]];
       NSError *cerr = nil;
-      if ([fm copyItemAtPath:[DDCore bundlePath] toPath:appCopy error:&cerr]) {
+      __block NSUInteger lastPct = 200;
+      BOOL copied = [DDDumpService copyTreeFrom:[DDCore bundlePath]
+                                              to:appCopy
+                                      failedItems:nil
+                                          progress:^(NSUInteger done, NSUInteger total) {
+        NSUInteger pct = total ? (NSUInteger)((double)done / (double)total * 100.0) : 100;
+        if (pct != lastPct && pct % 10 == 0) {
+          lastPct = pct;
+          onMain([NSString stringWithFormat:@"6/6 IPA için bundle kopyalanıyor… %lu%%",
+                  (unsigned long)pct]);
+        }
+      }] && ![DDDumpService isCancelled];
+      if (copied) {
         NSString *ipaPath = [DDSmartDump buildDecryptedIPAFromBundleCopy:tmpRoot
                                                                mainBinary:mainOut
                                                                     error:&cerr];

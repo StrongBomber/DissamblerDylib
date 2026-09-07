@@ -194,7 +194,6 @@ static BOOL dd_stream_file(NSFileHandle *src, uint64_t size, NSFileHandle *dst, 
 
   NSMutableData *d = [NSMutableData dataWithBytes:hdr length:30];
   [d appendData:nameData];
-  uint64_t dataOffset = self.offset + d.length;
   [self.handle writeData:d];
   self.offset += d.length;
 
@@ -209,14 +208,15 @@ static BOOL dd_stream_file(NSFileHandle *src, uint64_t size, NSFileHandle *dst, 
   self.offset += size;
   e.crc = crc;
 
-  // Local header'daki CRC'yi geri dönüp yaz
+  // Local header'daki CRC alanını geri dönüp yaz (header başı + 14 ofseti)
   uint8_t crcb[4];
   dd_put32(crcb, crc);
-  [self.handle seekToFileOffset:dataOffset - 30 + 14];
+  [self.handle seekToFileOffset:e.localHeaderOffset + 14];
   [self.handle writeData:[NSData dataWithBytes:crcb length:4]];
   [self.handle seekToFileOffset:self.offset];
 
   [self.entries addObject:e];
+  if (self.progressHandler) self.progressHandler(self.entries.count, self.totalBytes);
   return YES;
 }
 

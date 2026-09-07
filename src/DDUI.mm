@@ -13,6 +13,7 @@
 #import "DDDumpService.h"
 #import "DDZipWriter.h"
 #import "DDUICommon.h"
+#import "DDPanels.h"
 #import "DDFeatures.h"
 #import "DDSmartDump.h"
 #import "DDOverride.h"
@@ -68,6 +69,7 @@
     banner.text = @" ✏️ CANLI OVERRIDE AKTİF — oyun bu içeriği okuyor";
     [self.view addSubview:banner];
     [self.view bringSubviewToFront:banner];
+    self.contentTop = 24;
   }
 
   // Çok büyük dosyaları belleğe yükleme — kullanıcı paylaşarak alsın
@@ -75,7 +77,9 @@
       attributesOfItemAtPath:(self.effectivePath ?: self.filePath) error:nil];
   unsigned long long size = [attrs fileSize];
   if (size > 64ull * 1024 * 1024) {
-    UITextView *tv = [[UITextView alloc] initWithFrame:self.view.bounds];
+    UITextView *tv = [[UITextView alloc] initWithFrame:
+        CGRectMake(0, self.contentTop, self.view.bounds.size.width,
+                   self.view.bounds.size.height - self.contentTop)];
     tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     tv.editable = NO;
     tv.font = DDMonoFont(13);
@@ -123,7 +127,9 @@
         [ws showTextOrHex];
         return;
       }
-      UIScrollView *sv = [[UIScrollView alloc] initWithFrame:ws.view.bounds];
+      UIScrollView *sv = [[UIScrollView alloc] initWithFrame:
+          CGRectMake(0, ws.contentTop, ws.view.bounds.size.width,
+                     ws.view.bounds.size.height - ws.contentTop)];
       sv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
       sv.minimumZoomScale = 0.3;
       sv.maximumZoomScale = 8.0;
@@ -151,7 +157,9 @@
     NSData *data = [NSData dataWithContentsOfFile:(ws.effectivePath ?: ws.filePath)];
     dispatch_async(dispatch_get_main_queue(), ^{
       if (!data) {
-        UITextView *tv = [[UITextView alloc] initWithFrame:ws.view.bounds];
+        UITextView *tv = [[UITextView alloc] initWithFrame:
+            CGRectMake(0, ws.contentTop, ws.view.bounds.size.width,
+                       ws.view.bounds.size.height - ws.contentTop)];
         tv.text = @"Dosya okunamadı.";
         tv.editable = NO;
         [ws.view addSubview:tv];
@@ -196,7 +204,9 @@
         }
       }
 
-      UITextView *tv = [[UITextView alloc] initWithFrame:ws.view.bounds];
+      UITextView *tv = [[UITextView alloc] initWithFrame:
+          CGRectMake(0, ws.contentTop, ws.view.bounds.size.width,
+                     ws.view.bounds.size.height - ws.contentTop)];
       tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
       tv.editable = NO;
       tv.font = DDMonoFont(12);
@@ -246,6 +256,7 @@
 @property (nonatomic, strong) UISearchBar *searchBar;
 @property (nonatomic, strong) NSArray<DDBrowserEntry *> *entries;
 @property (nonatomic, copy) NSString *filter;
+@property (nonatomic, strong, nullable) NSTimer *searchDebounce;
 @end
 
 @implementation DDBrowserVC
@@ -436,76 +447,52 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 
 - (void)longPress:(NSIndexPath *)indexPath {
   DDBrowserEntry *e = self.entries[indexPath.row];
-  UIAlertController *a = [UIAlertController alertControllerWithTitle:e.name
-                                                             message:e.path
-                                                      preferredStyle:UIAlertControllerStyleActionSheet];
+  __weak typeof(self) ws = self;
+
+  NSMutableArray<NSString *> *titles = [NSMutableArray array];
   if (!e.isDir) {
-    [a addAction:[UIAlertAction actionWithTitle:@"📄 Önizle" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-      DDPreviewVC *pv = [[DDPreviewVC alloc] initWithFile:e.path];
-      [self.navigationController pushViewController:pv animated:YES];
-    }]];
-    [a addAction:[UIAlertAction actionWithTitle:@"✏️ Düzenle (canlı)" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-      DDEditorVC *ev = [[DDEditorVC alloc] initWithFile:e.path];
-      [self.navigationController pushViewController:ev animated:YES];
-    }]];
-    [a addAction:[UIAlertAction actionWithTitle:@"🔩 Hex editör (canlı)" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-      DDHexEditorVC *hv = [[DDHexEditorVC alloc] initWithFile:e.path];
-      [self.navigationController pushViewController:hv animated:YES];
-    }]];
-    [a addAction:[UIAlertAction actionWithTitle:@"🧠 Analiz et" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-      DDAnalyzerVC *av = [[DDAnalyzerVC alloc] initWithFile:e.path];
-      [self.navigationController pushViewController:av animated:YES];
-    }]];
-    [a addAction:[UIAlertAction actionWithTitle:@"🧵 String'leri çıkar" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-      [self extractStringsOf:e.path];
-    }]];
-    [a addAction:[UIAlertAction actionWithTitle:@"🗃 Veritabanı olarak aç" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-      DDDBBrowserVC *dv = [[DDDBBrowserVC alloc] initWithDBPath:e.path];
-      [self.navigationController pushViewController:dv animated:YES];
-    }]];
+    [titles addObjectsFromArray:@[
+      @"📄 Önizle", @"✏️ Düzenle (canlı)", @"🔩 Hex editör (canlı)",
+      @"🧠 Analiz et", @"🧵 String'leri çıkar", @"🗃 Veritabanı olarak aç",
+    ]];
   }
-  [a addAction:[UIAlertAction actionWithTitle:@"📤 Paylaş" style:UIAlertActionStyleDefault
-                                     handler:^(__kindof UIAlertAction *_) {
-    [self shareEntry:e];
-  }]];
-  if (e.isDir) {
-    [a addAction:[UIAlertAction actionWithTitle:@"🗜 ZIP olarak paylaş" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-      [self zipAndShare:e.path];
-    }]];
-  }
-  [a addAction:[UIAlertAction actionWithTitle:@"📋 Yolu kopyala" style:UIAlertActionStyleDefault
-                                     handler:^(__kindof UIAlertAction *_) {
-    UIPasteboard.generalPasteboard.string = e.path;
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"ℹ️ Özellikler" style:UIAlertActionStyleDefault
-                                     handler:^(__kindof UIAlertAction *_) {
-    NSString *msg = [NSString stringWithFormat:
-        @"Yol: %@\nBoyut: %@\nTür: %@\nDeğiştirilme: %@",
-        e.path, [DDCore humanSize:e.size], e.isDir ? @"Klasör" : @"Dosya",
-        e.modified ?: @"?"];
-    DDAlert(@"Özellikler", msg);
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-  if (a.popoverPresentationController) {
-    a.popoverPresentationController.sourceView = self.view;
-    a.popoverPresentationController.sourceRect =
-        CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 1, 1);
-  }
-  [self presentViewController:a animated:YES completion:nil];
+  [titles addObject:@"📤 Paylaş"];
+  if (e.isDir) [titles addObject:@"🗜 ZIP olarak paylaş"];
+  [titles addObjectsFromArray:@[@"📋 Yolu kopyala", @"ℹ️ Özellikler", @"Kapat"]];
+
+  DDConfirmPanel(e.name, e.path, titles, -1, ^(NSInteger idx) {
+    NSInteger i = 0;
+    if (!e.isDir) {
+      if (idx == i) { DDPreviewVC *vc = [[DDPreviewVC alloc] initWithFile:e.path]; [ws.navigationController pushViewController:vc animated:YES]; return; } i++;
+      if (idx == i) { DDEditorVC *vc = [[DDEditorVC alloc] initWithFile:e.path]; [ws.navigationController pushViewController:vc animated:YES]; return; } i++;
+      if (idx == i) { DDHexEditorVC *vc = [[DDHexEditorVC alloc] initWithFile:e.path]; [ws.navigationController pushViewController:vc animated:YES]; return; } i++;
+      if (idx == i) { DDAnalyzerVC *vc = [[DDAnalyzerVC alloc] initWithFile:e.path]; [ws.navigationController pushViewController:vc animated:YES]; return; } i++;
+      if (idx == i) { [ws extractStringsOf:e.path]; return; } i++;
+      if (idx == i) { DDDBBrowserVC *vc = [[DDDBBrowserVC alloc] initWithDBPath:e.path]; [ws.navigationController pushViewController:vc animated:YES]; return; } i++;
+    }
+    if (idx == i) { [ws shareEntry:e]; return; } i++;
+    if (e.isDir) { if (idx == i) { [ws zipAndShare:e.path]; return; } i++; }
+    if (idx == i) { UIPasteboard.generalPasteboard.string = e.path; DDToast(@"Yol kopyalandı"); return; } i++;
+    if (idx == i) {
+      NSString *msg = [NSString stringWithFormat:
+          @"Yol: %@\nBoyut: %@\nTür: %@\nDeğiştirilme: %@",
+          e.path, [DDCore humanSize:e.size], e.isDir ? @"Klasör" : @"Dosya",
+          e.modified ?: @"?"];
+      DDAlert(@"Özellikler", msg);
+    }
+  });
 }
 
-#pragma mark Search
+#pragma mark Search (debounce'lu — her tuş vuruşunda disk taraması YOK)
 
 - (void)searchBar:(UISearchBar *)searchBar textDidChange:(NSString *)searchText {
   self.filter = searchText;
-  [self reload];
+  [self.searchDebounce invalidate];
+  self.searchDebounce = [NSTimer scheduledTimerWithTimeInterval:0.35
+                                                         repeats:NO
+                                                           block:^(NSTimer *t) {
+    [self reload];
+  }];
 }
 
 @end
@@ -789,18 +776,16 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
       DDHideProgress();
       NSString *msg = [NSString stringWithFormat:@"%lu ikili dump edildi:\n%@", (unsigned long)n, dir];
       DDLog(@"📚 %@", msg);
-      UIAlertController *a = [UIAlertController alertControllerWithTitle:@"Tamamlandı"
-                                                                 message:msg
-                                                          preferredStyle:UIAlertControllerStyleAlert];
-      [a addAction:[UIAlertAction actionWithTitle:@"📤 ZIP olarak paylaş" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-        [DDDumpService zipDirectory:dir completion:^(NSString *zipPath, NSError *error) {
-          if (zipPath) DDShareURL([NSURL fileURLWithPath:zipPath]);
-          else DDAlert(@"ZIP", @"Başarısız");
-        }];
-      }]];
-      [a addAction:[UIAlertAction actionWithTitle:@"Kapat" style:UIAlertActionStyleCancel handler:nil]];
-      [DDTopMostVC() presentViewController:a animated:YES completion:nil];
+      DDConfirmPanel(@"Tamamlandı", msg, @[@"📤 ZIP olarak paylaş", @"Kapat"], -1, ^(NSInteger idx) {
+        if (idx == 0) {
+          DDShowProgress(@"ZIP hazırlanıyor…");
+          [DDDumpService zipDirectory:dir completion:^(NSString *zipPath, NSError *error) {
+            DDHideProgress();
+            if (zipPath) DDShareURL([NSURL fileURLWithPath:zipPath]);
+            else DDAlert(@"ZIP", @"Başarısız");
+          }];
+        }
+      });
     });
   });
 }
@@ -937,27 +922,26 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   if (indexPath.section != 1) return;
   NSString *what = indexPath.row == 0 ? @"günlükleri"
       : indexPath.row == 1 ? @"yakalananları" : @"TÜM veriyi";
-  UIAlertController *a = [UIAlertController
-      alertControllerWithTitle:@"Emin misiniz?"
-                       message:[NSString stringWithFormat:@"%@ silinecek.", what]
-                preferredStyle:UIAlertControllerStyleAlert];
-  [a addAction:[UIAlertAction actionWithTitle:@"Sil" style:UIAlertActionStyleDestructive
-                                    handler:^(__kindof UIAlertAction *_) {
+  __weak typeof(self) ws = self;
+  DDConfirmPanel(@"Emin misiniz?", [NSString stringWithFormat:@"%@ silinecek.", what],
+                 @[@"Sil", @"Vazgeç"], 0, ^(NSInteger idx) {
+    if (idx != 0) return;
     if (indexPath.row == 0) [DDCore clearLog];
     else if (indexPath.row == 1) [DDCore clearCaptured];
     else [DDCore clearAllData];
-    [self.table reloadData];
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-  [self presentViewController:a animated:YES completion:nil];
+    DDToast(@"Temizlendi");
+    [ws.table reloadData];
+  });
 }
 
 @end
 
 #pragma mark - DDMenuTableVC
 
-@interface DDMenuTableVC : UIViewController <UITableViewDataSource, UITableViewDelegate>
+@interface DDMenuTableVC : UIViewController <UITableViewDataSource, UITableViewDelegate,
+                                                UIAdaptivePresentationControllerDelegate>
 @property (nonatomic, strong) UITableView *table;
+@property (nonatomic, copy, nullable) void (^onDismiss)(void);
 @end
 
 @implementation DDMenuTableVC {
@@ -965,10 +949,23 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   NSArray<NSString *> *_sectionTitles;
 }
 
+/// Koyu tema renkleri
+static UIColor *DDMenuBg(void)   { return [UIColor colorWithRed:0.055 green:0.059 blue:0.07 alpha:1.0]; }
+static UIColor *DDMenuCard(void) { return [UIColor colorWithWhite:1 alpha:0.07]; }
+static UIColor *DDMenuTxt(void)  { return [UIColor whiteColor]; }
+static UIColor *DDMenuSub2(void) { return [UIColor colorWithWhite:0.55 alpha:1.0]; }
+static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 blue:0.98 alpha:1.0]; }
+
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.title = @"DDumper";
-  self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
+  self.view.backgroundColor = DDMenuBg();
+  self.navigationController.navigationBar.barStyle = UIBarStyleBlack;
+  self.navigationController.navigationBar.translucent = YES;
+  if (@available(iOS 13.0, *)) {
+    self.navigationController.navigationBar.backgroundColor = nil;
+  }
+  self.presentationController.delegate = self;
 
   _sectionTitles = @[@"İNCELEME", @"CANLI DÜZENLEME", @"DOSYA ARAÇLARI",
                      @"GELİŞMİŞ", @"DUMP", @""];
@@ -1005,43 +1002,112 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   self.table.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
   self.table.dataSource = self;
   self.table.delegate = self;
-  self.table.rowHeight = 64;
+  self.table.rowHeight = 60;
+  self.table.backgroundColor = [UIColor clearColor];
+  self.table.separatorColor = [UIColor colorWithWhite:1 alpha:0.06];
+  self.table.sectionHeaderHeight = 30;
   [self.view addSubview:self.table];
 
   UIBarButtonItem *close = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
                                                                          target:self
                                                                          action:@selector(close)];
   self.navigationItem.leftBarButtonItem = close;
+
+  // ── Hızlı aksiyon kartı (header) ──
+  CGFloat w = self.view.bounds.size.width;
+  UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 138)];
+  header.backgroundColor = [UIColor clearColor];
+
+  UIView *card = [[UIView alloc] initWithFrame:CGRectMake(16, 8, w - 32, 122)];
+  card.backgroundColor = DDMenuCard();
+  card.layer.cornerRadius = 16;
+  [header addSubview:card];
+
+  UILabel *l1 = [[UILabel alloc] init];
+  l1.text = [NSString stringWithFormat:@"%@", [DDCore appName]];
+  l1.font = [UIFont boldSystemFontOfSize:17];
+  l1.textColor = DDMenuTxt();
+  l1.textAlignment = NSTextAlignmentCenter;
+  [card addSubview:l1];
+
+  UILabel *l2 = [[UILabel alloc] init];
+  l2.text = [NSString stringWithFormat:@"%@ • DDumper v%@", [DDCore bundleID], DDVersionString];
+  l2.font = [UIFont systemFontOfSize:11];
+  l2.textColor = DDMenuSub2();
+  l2.textAlignment = NSTextAlignmentCenter;
+  [card addSubview:l2];
+
+  UIButton *fullBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+  [fullBtn setTitle:@"💾  TAM DUMP" forState:UIControlStateNormal];
+  [fullBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+  fullBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+  fullBtn.backgroundColor = DDMenuAcc();
+  fullBtn.layer.cornerRadius = 12;
+  [fullBtn addTarget:self action:@selector(startFullDump) forControlEvents:UIControlEventTouchUpInside];
+  [card addSubview:fullBtn];
+
+  UIButton *smartBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+  [smartBtn setTitle:@"🔐  AKILLI DECRYPT" forState:UIControlStateNormal];
+  [smartBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+  smartBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+  smartBtn.backgroundColor = [UIColor colorWithRed:0.95 green:0.55 blue:0.12 alpha:1.0];
+  smartBtn.layer.cornerRadius = 12;
+  [smartBtn addTarget:self action:@selector(startSmartDump) forControlEvents:UIControlEventTouchUpInside];
+  [card addSubview:smartBtn];
+
+  // yerleşim (frame tabanlı, basit ve hızlı)
+  card.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+  l1.frame = CGRectMake(12, 12, w - 56, 22);
+  l2.frame = CGRectMake(12, 34, w - 56, 16);
+  CGFloat bw = (w - 32 - 36) / 2;
+  fullBtn.frame = CGRectMake(12, 58, bw, 50);
+  smartBtn.frame = CGRectMake(24 + bw, 58, bw, 50);
+
+  self.table.tableHeaderView = header;
 }
 
 - (void)close {
-  [self dismissViewControllerAnimated:YES completion:nil];
+  void (^d)(void) = self.onDismiss;
+  [self dismissViewControllerAnimated:YES completion:^{
+    if (d) d();
+  }];
+}
+
+- (void)presentationControllerDidDismiss:(UIPresentationController *)presentationController {
+  // sayfayı aşağı kaydırarak kapattıysa sayacı düşür
+  if (self.onDismiss) self.onDismiss();
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+  NSString *t = (section < (NSInteger)_sectionTitles.count) ? _sectionTitles[section] : nil;
+  if (t.length == 0) return nil;
+  NSAttributedString *attr = [[NSAttributedString alloc]
+      initWithString:t attributes:@{NSForegroundColorAttributeName: DDMenuSub2(),
+                                    NSFontAttributeName: [UIFont boldSystemFontOfSize:11]}];
+  UILabel *lbl = [UILabel new];
+  lbl.attributedText = attr;
+  return t;
+}
+
+- (void)tableView:(UITableView *)tableView willDisplayHeaderView:(UIView *)view
+                                        forSection:(NSInteger)section {
+  // başlık metinlerini küçült ve gri yap
+  if ([view isKindOfClass:[UITableViewHeaderFooterView class]]) {
+    UITableViewHeaderFooterView *hv = (UITableViewHeaderFooterView *)view;
+    hv.textLabel.font = [UIFont boldSystemFontOfSize:11];
+    hv.textLabel.textColor = DDMenuSub2();
+    hv.contentView.backgroundColor = [UIColor clearColor];
+    hv.textLabel.textColor = DDMenuSub2();
+  }
 }
 
 - (UIView *)tableView:(UITableView *)tableView viewForHeaderInSection:(NSInteger)section {
-  if (section > 0) return nil;
-  // Uygulama künyesi
-  UIStackView *stack = [[UIStackView alloc] init];
-  stack.axis = UILayoutConstraintAxisVertical;
-  stack.spacing = 2;
-  stack.alignment = UIStackViewAlignmentCenter;
-  UILabel *l1 = [UILabel new];
-  l1.text = [NSString stringWithFormat:@"%@ (%@)", [DDCore appName], [DDCore bundleID]];
-  l1.font = [UIFont boldSystemFontOfSize:15];
-  l1.textAlignment = NSTextAlignmentCenter;
-  UILabel *l2 = [UILabel new];
-  l2.text = [NSString stringWithFormat:@"DDumper v%@ • %@", DDVersionString, [DDCore executablePath].lastPathComponent];
-  l2.font = [UIFont systemFontOfSize:11];
-  l2.textColor = [UIColor grayColor];
-  l2.textAlignment = NSTextAlignmentCenter;
-  [stack addArrangedSubview:l1];
-  [stack addArrangedSubview:l2];
-  stack.frame = CGRectMake(0, 0, tableView.bounds.size.width, 52);
-  return stack;
+  return nil;  // başlıklar titleForHeaderInSection'den (sistem çizer, biz renklendiririz)
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-  return section == 0 ? 52 : 34;
+  NSString *t = (section < (NSInteger)_sectionTitles.count) ? _sectionTitles[section] : nil;
+  return (t.length > 0) ? 30 : 8;
 }
 
 - (nullable NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
@@ -1062,10 +1128,15 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:id];
   if (!cell) {
     cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:id];
-    cell.textLabel.font = [UIFont boldSystemFontOfSize:16];
-    cell.detailTextLabel.font = [UIFont systemFontOfSize:12];
-    cell.detailTextLabel.textColor = [UIColor grayColor];
+    cell.textLabel.font = [UIFont boldSystemFontOfSize:15];
+    cell.detailTextLabel.font = [UIFont systemFontOfSize:11];
+    cell.detailTextLabel.textColor = DDMenuSub2();
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    cell.backgroundColor = DDMenuCard();
+    cell.textLabel.textColor = DDMenuTxt();
+    UIView *sel = [[UIView alloc] init];
+    sel.backgroundColor = [UIColor colorWithWhite:1 alpha:0.12];
+    cell.selectedBackgroundView = sel;
   }
   NSDictionary *r = _sections[indexPath.section][indexPath.row];
   cell.textLabel.text = [NSString stringWithFormat:@"%@  %@", r[@"icon"], r[@"title"]];
@@ -1118,27 +1189,23 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 
 - (void)startSmartDump {
   __weak typeof(self) ws = self;
-  UIAlertController *a = [UIAlertController
-      alertControllerWithTitle:@"🔐 Akıllı Decrypt & IPA"
-                       message:[NSString stringWithFormat:
-                                @"Şunlar üretilir:\n\n"
-                                @"• Ana ikili (bellekten, şifresi çözülmüş)\n"
-                                @"• Tüm framework/dylib'ler\n"
-                                @"• Strings + ObjC class-dump raporları\n"
-                                @"• %@ yeniden imzalanmaya hazır DECRYPTED IPA\n\n"
-                                @"Devam edilsin?",
-                                [DDCore ipaBuild] ? @"ESign ile" : @""]
-                preferredStyle:UIAlertControllerStyleAlert];
-  [a addAction:[UIAlertAction actionWithTitle:@"Başlat" style:UIAlertActionStyleDefault
-                                    handler:^(__kindof UIAlertAction *_) {
-    [ws runSmartDump];
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-  [DDTopMostVC() presentViewController:a animated:YES completion:nil];
+  NSString *msg = [NSString stringWithFormat:
+      @"Şunlar üretilir:\n\n"
+      @"• Ana ikili (bellekten, şifresi çözülmüş)\n"
+      @"• Tüm framework/dylib'ler\n"
+      @"• Strings + ObjC class-dump raporları\n"
+      @"• %@ yeniden imzalanmaya hazır DECRYPTED IPA\n\n"
+      @"Devam edilsin?",
+      [DDCore ipaBuild] ? @"ESign ile" : @""];
+  DDConfirmPanel(@"🔐 Akıllı Decrypt & IPA", msg, @[@"Başlat", @"Vazgeç"], -1, ^(NSInteger idx) {
+    if (idx == 0) [ws runSmartDump];
+  });
 }
 
 - (void)runSmartDump {
-  DDShowProgress(@"Akıllı decrypt çalışıyor…");
+  DDShowProgressCancellable(@"🔐 Akıllı Decrypt", ^{
+    [DDDumpService cancelCurrentDump];
+  });
   [DDSmartDump runWithProgress:^(NSString *stage) {
     DDUpdateProgress(stage);
   } completion:^(NSString *dir, NSString *ipaPath, NSError *error) {
@@ -1154,22 +1221,21 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
                        @"kurabilirsiniz — FairPlay şifresi kaldırılmıştır.)", ipaPath];
     }
     DDLog(@"🔐 Akıllı dump bitti: %@", ipaPath ?: dir);
-    UIAlertController *a = [UIAlertController alertControllerWithTitle:@"Tamamlandı"
-                                                               message:msg
-                                                        preferredStyle:UIAlertControllerStyleAlert];
-    [a addAction:[UIAlertAction actionWithTitle:@"📤 IPA'yı paylaş" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-      if (ipaPath) DDShareURL([NSURL fileURLWithPath:ipaPath]);
-    }]];
-    [a addAction:[UIAlertAction actionWithTitle:@"📂 Klasörü ZIP'le ve paylaş" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-      [DDDumpService zipDirectory:dir completion:^(NSString *zipPath, NSError *zerr) {
-        if (zipPath) DDShareURL([NSURL fileURLWithPath:zipPath]);
-        else DDAlert(@"ZIP", zerr.localizedDescription ?: @"Başarısız");
-      }];
-    }]];
-    [a addAction:[UIAlertAction actionWithTitle:@"Kapat" style:UIAlertActionStyleCancel handler:nil]];
-    [DDTopMostVC() presentViewController:a animated:YES completion:nil];
+    DDConfirmPanel(@"Tamamlandı", msg,
+                   ipaPath ? @[@"📤 IPA'yı paylaş", @"📂 ZIP'le ve paylaş", @"Kapat"]
+                           : @[@"📂 ZIP'le ve paylaş", @"Kapat"],
+                   -1, ^(NSInteger idx) {
+      if (ipaPath && idx == 0) {
+        DDShareURL([NSURL fileURLWithPath:ipaPath]);
+      } else if ((ipaPath && idx == 1) || (!ipaPath && idx == 0)) {
+        DDShowProgress(@"ZIP hazırlanıyor…");
+        [DDDumpService zipDirectory:dir completion:^(NSString *zipPath, NSError *zerr) {
+          DDHideProgress();
+          if (zipPath) DDShareURL([NSURL fileURLWithPath:zipPath]);
+          else DDAlert(@"ZIP", zerr.localizedDescription ?: @"Başarısız");
+        }];
+      }
+    });
   }];
 }
 
@@ -1181,7 +1247,7 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 - (void)startFullDump {
   __weak typeof(self) ws = self;
   DDShowProgress(@"Boyut hesaplanıyor…");
-  dispatch_async([DDCore ioQueue], ^{
+  dispatch_async([DDCore dumpQueue], ^{
     DD_GUARD_CURRENT_BLOCK;
     unsigned long long bundleSize = [DDCore folderSize:[DDCore bundlePath]];
     unsigned long long free = [DDCore freeDiskBytes];
@@ -1191,34 +1257,38 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
           @"Bundle boyutu: %@\nBoş disk alanı: %@\n\nTüm bundle kopyalanır, ana ikili bellekten "
           @"çözülür ve raporlar üretilir. Bu işlem büyük oyunlarda dakikalar sürebilir. Devam?",
           [DDCore humanSize:bundleSize], [DDCore humanSize:free]];
-      UIAlertController *a = [UIAlertController alertControllerWithTitle:@"Tam Dump"
-                                                                 message:msg
-                                                          preferredStyle:UIAlertControllerStyleAlert];
-      [a addAction:[UIAlertAction actionWithTitle:@"Başlat" style:UIAlertActionStyleDefault
-                                       handler:^(__kindof UIAlertAction *_) {
-        [ws runDump];
-      }]];
-      [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-      [DDTopMostVC() presentViewController:a animated:YES completion:nil];
+      DDConfirmPanel(@"💾 Tam Dump", msg, @[@"Başlat", @"Vazgeç"], -1, ^(NSInteger idx) {
+        if (idx == 0) [ws runDump];
+      });
     });
   });
 }
 
 - (void)runDump {
-  DDShowProgress(@"Tam dump çalışıyor…");
+  DDShowProgressCancellable(@"💾 Tam Dump", ^{
+    [DDDumpService cancelCurrentDump];
+  });
   [DDDumpService runFullDumpWithProgress:^(NSString *stage) {
     DDUpdateProgress(stage);
   } completion:^(NSString *dumpDir, NSString *zipPath, NSError *error) {
     DDHideProgress();
     if (error) {
-      DDAlert(@"Dump hatası", error.localizedDescription ?: @"?");
+      if ([error.domain isEqualToString:@"DDumper"] && error.code == -21) {
+        DDToast(@"Dump iptal edildi");
+      } else {
+        DDAlert(@"Dump hatası", error.localizedDescription ?: @"?");
+      }
       return;
     }
     if (zipPath) {
       DDLog(@"✅ Tam dump ZIP hazır: %@", zipPath);
-      DDShareURL([NSURL fileURLWithPath:zipPath]);
+      DDToast(@"Dump tamamlandı — paylaşım açılıyor");
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
+                     dispatch_get_main_queue(), ^{
+        DDShareURL([NSURL fileURLWithPath:zipPath]);
+      });
     } else if (dumpDir) {
-      DDAlert(@"Tamamlandı (ZIP yok)",
+      DDAlert(@"Tamamlandı (ZIP kapalı)",
               [NSString stringWithFormat:@"Klasör hazır:\n%@", dumpDir]);
     }
   }];
@@ -1243,9 +1313,26 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 }
 
 - (void)showAfterLaunch {
-  dispatch_async(dispatch_get_main_queue(), ^{
+  if ([NSThread isMainThread]) {
     [self setupWindow];
+  } else {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [self setupWindow];
+    });
+  }
+}
+
+- (UIWindow *)ensureWindow {
+  if ([NSThread isMainThread]) {
+    [self setupWindow];
+    return self.window;
+  }
+  __block UIWindow *w = nil;
+  dispatch_sync(dispatch_get_main_queue(), ^{
+    [self setupWindow];
+    w = self.window;
   });
+  return w;
 }
 
 - (void)setupWindow {
@@ -1297,6 +1384,9 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 }
 
 - (void)buttonTapped {
+  if (@available(iOS 10.0, *)) {
+    [[UIImpactFeedbackGenerator style:UIImpactFeedbackStyleMedium] impactOccurred];
+  }
   [self openMenu];
 }
 
@@ -1307,10 +1397,20 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   [g setTranslation:CGPointZero inView:self.window];
   if (g.state == UIGestureRecognizerStateEnded) {
     CGRect b = [UIScreen mainScreen].bounds;
-    CGFloat x = MIN(MAX(self.button.center.x, 30), b.size.width - 30);
-    CGFloat y = MIN(MAX(self.button.center.y, 30), b.size.height - 30);
-    self.button.center = CGPointMake(x, y);
-    [[NSUserDefaults standardUserDefaults] setDouble:x forKey:@"dd.btnx"];
+    CGFloat margin = 34;
+    CGFloat y = MIN(MAX(self.button.center.y, margin + 40), b.size.height - margin);
+    // en yakın yatay kenara yumuşakça yapış
+    CGFloat targetX = (self.button.center.x < b.size.width / 2) ? margin : b.size.width - margin;
+    [UIView animateWithDuration:0.25
+                          delay:0
+         usingSpringWithDamping:0.75
+          initialSpringVelocity:0.4
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+                       self.button.center = CGPointMake(targetX, y);
+                     }
+                     completion:nil];
+    [[NSUserDefaults standardUserDefaults] setDouble:targetX forKey:@"dd.btnx"];
     [[NSUserDefaults standardUserDefaults] setDouble:y forKey:@"dd.btny"];
     [[NSUserDefaults standardUserDefaults] synchronize];
   }
@@ -1338,6 +1438,9 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   if (@available(iOS 13.0, *)) {
     nav.modalPresentationStyle = UIModalPresentationPageSheet;
   }
+  [DDOverlayRoot panelWillAppear];  // klavye/başvuru için pencereyi key yap
+  __weak DDOverlayController *ws = self;
+  menu.onDismiss = ^{ [DDOverlayRoot panelDidDisappear]; };
   [root presentViewController:nav animated:YES completion:nil];
 }
 

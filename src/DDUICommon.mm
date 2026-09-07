@@ -1,9 +1,15 @@
 //
 //  DDUICommon.mm
+//  DDumper — paylaşılan UI yardımcıları
+//
+//  Tüm sunumlar (uyarı, ilerleme, paylaşım) DDumper'ın KENDİ penceresinde
+//  yapılır → oyunun view hiyerarşisiyle çakışma / görünmez olma yok.
 //
 
 #import "DDUICommon.h"
 #import "DDCore.h"
+#import "DDPanels.h"
+#import "DDUI.h"
 
 UITableViewStyle DDTableStyle(void) {
   if (@available(iOS 13.0, *)) return UITableViewStyleInsetGrouped;
@@ -18,59 +24,37 @@ UIFont *DDMonoFont(CGFloat size) {
 }
 
 UIViewController *DDTopMostVC(void) {
-  UIViewController *vc = [UIApplication sharedApplication].keyWindow.rootViewController;
-  if (!vc) {
-    // UIWindowScene tabanlı uygulamalar (iOS 13+)
-    if (@available(iOS 13.0, *)) {
-      for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-        if ([scene isKindOfClass:[UIWindowScene class]]) {
-          UIWindowScene *ws = (UIWindowScene *)scene;
-          UIWindow *kw = nil;
-          if (@available(iOS 15.0, *)) {
-            kw = ws.keyWindow;
-          }
-          if (!kw) {
-            for (UIWindow *w in ws.windows) {
-              if (w.rootViewController) { kw = w; break; }
-            }
-          }
-          if (kw.rootViewController) {
-            vc = kw.rootViewController;
-            break;
-          }
-        }
-      }
-    }
-  }
-  while (vc.presentedViewController) vc = vc.presentedViewController;
-  return vc;
+  // Yalnızca sunum yapabileceğimiz kendi root'umuz
+  return [DDOverlayRoot rootVC];
 }
 
+#pragma mark - Uyarı / bilgi
+
 void DDAlert(NSString *title, NSString *message) {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    UIAlertController *a = [UIAlertController alertControllerWithTitle:title
-                                                               message:message
-                                                        preferredStyle:UIAlertControllerStyleAlert];
-    [a addAction:[UIAlertAction actionWithTitle:@"Tamam" style:UIAlertActionStyleDefault handler:nil]];
-    [DDTopMostVC() presentViewController:a animated:YES completion:nil];
-  });
+  DDConfirmPanel(title, message, @[@"Tamam"], -1, ^(NSInteger idx) {});
 }
 
 void DDAlertOnMain(NSString *title, NSString *message) {
   DDAlert(title, message);
 }
 
+void DDToast(NSString *message) {
+  [DDProgressHUD toast:message];
+}
+
+#pragma mark - Paylaşım
+
 void DDShareURL(NSURL *url) {
   if (!url) return;
   dispatch_async(dispatch_get_main_queue(), ^{
     UIActivityViewController *act =
         [[UIActivityViewController alloc] initWithActivityItems:@[url] applicationActivities:nil];
-    UIViewController *presenter = DDTopMostVC();
-    if (act.popoverPresentationController) {
-      act.popoverPresentationController.sourceView = presenter.view;
-      act.popoverPresentationController.sourceRect =
-          CGRectMake(presenter.view.bounds.size.width / 2, 60, 1, 1);
-    }
+    [act setCompletionWithItemsHandler:^(UIActivityType _Nullable type, BOOL completed,
+                                          NSArray *_Nullable returned, NSError *_Nullable err) {
+      [DDOverlayRoot panelDidDisappear];
+    }];
+    UIViewController *presenter = [DDOverlayRoot rootVC];
+    [DDOverlayRoot panelWillAppear];
     [presenter presentViewController:act animated:YES completion:nil];
   });
 }
@@ -86,48 +70,22 @@ void DDShareText(NSString *text, NSString *fileName) {
   });
 }
 
-#pragma mark - Progress
-
-static UIAlertController *dd_progress_alert = nil;
-
-static void dd_present_new_progress(NSString *title) {
-  UIAlertController *a = [UIAlertController alertControllerWithTitle:title
-                                                             message:@" "
-                                                      preferredStyle:UIAlertControllerStyleAlert];
-  [a addAction:[UIAlertAction actionWithTitle:@"İptal" style:UIAlertActionStyleCancel
-                                     handler:^(UIAlertAction *_) {
-                                       if (dd_progress_alert == a) dd_progress_alert = nil;
-                                     }]];
-  dd_progress_alert = a;
-  [DDTopMostVC() presentViewController:a animated:YES completion:nil];
-}
+#pragma mark - Progress (yeni HUD'a köprü)
 
 void DDShowProgress(NSString *title) {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    void (^presentNew)(void) = ^{ dd_present_new_progress(title); };
-    if (dd_progress_alert) {
-      UIAlertController *old = dd_progress_alert;
-      dd_progress_alert = nil;
-      [old dismissViewControllerAnimated:NO completion:presentNew];
-    } else {
-      presentNew();
-    }
-  });
+  [DDProgressHUD show:title];
+}
+
+void DDShowProgressCancellable(NSString *title, void (^cancel)(void)) {
+  [DDProgressHUD showCancellable:title cancel:cancel];
 }
 
 void DDUpdateProgress(NSString *msg) {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    dd_progress_alert.message = msg;
-  });
+  [DDProgressHUD update:msg];
 }
 
 void DDHideProgress(void) {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    if (dd_progress_alert) {
-      [dd_progress_alert dismissViewControllerAnimated:YES completion:nil];
-      dd_progress_alert = nil;
-    }
-  });
+  [DDProgressHUD hide];
 }
 
 #pragma mark - Değer yardımcıları
@@ -166,7 +124,7 @@ NSString *DDShortValueDescription(id v, NSUInteger maxLen) {
   } else if ([v isKindOfClass:[NSData class]]) {
     s = [NSString stringWithFormat:@"<veri %lu bayt>", (unsigned long)[v length]];
   } else if ([v isKindOfClass:[NSArray class]]) {
-    s = [NSString stringWithFormat:@"( %lu oge )", (unsigned long)[v count]];
+    s = [NSString stringWithFormat:@"( %lu öğe )", (unsigned long)[v count]];
   } else if ([v isKindOfClass:[NSDictionary class]]) {
     s = [NSString stringWithFormat:@"{ %lu anahtar }", (unsigned long)[v count]];
   } else if ([v isKindOfClass:[NSNumber class]]) {

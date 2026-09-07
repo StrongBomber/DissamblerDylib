@@ -11,6 +11,7 @@
 #import "DDFeatures.h"
 #import "DDCore.h"
 #import "DDUICommon.h"
+#import "DDPanels.h"
 
 @interface DDDefaultsVC () <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
 @property (nonatomic, strong) UITableView *table;
@@ -108,60 +109,46 @@
   NSString *key = self.visible[indexPath.row];
   id cur = [[NSUserDefaults standardUserDefaults] objectForKey:key];
 
-  UIAlertController *a = [UIAlertController
-      alertControllerWithTitle:key
-                       message:[NSString stringWithFormat:@"Mevcut: %@\nYeni değer girin "
-                                                         @"(true/false, sayı veya metin):",
-                                DDShortValueDescription(cur, 60)]
-                preferredStyle:UIAlertControllerStyleAlert];
-  [a addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-    tf.text = [cur description];
-    tf.font = DDMonoFont(12);
-  }];
   __weak typeof(self) ws = self;
-  [a addAction:[UIAlertAction actionWithTitle:@"Kaydet" style:UIAlertActionStyleDefault
-                                    handler:^(UIAlertAction *_) {
-    id nv = DDInferValueFromString(a.textFields.firstObject.text);
-    [[NSUserDefaults standardUserDefaults] setObject:nv forKey:key];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-    DDLog(@"🔧 Defaults: %@ = %@", key, DDShortValueDescription(nv, 40));
+  DDInputPanelShow(key,
+                   [NSString stringWithFormat:@"Mevcut: %@",
+                    DDShortValueDescription(cur, 60)],
+                   @[@{ @"placeholder": @"yeni değer (true/false, sayı, metin)",
+                        @"text": [cur description] }],
+                   @"Kaydet", @"Sil", ^(NSInteger idx, NSArray<NSString *> *values) {
+    if (idx == 1) {
+      id nv = DDInferValueFromString(values.firstObject);
+      [[NSUserDefaults standardUserDefaults] setObject:nv forKey:key];
+      [[NSUserDefaults standardUserDefaults] synchronize];
+      DDLog(@"🔧 Defaults: %@ = %@", key, DDShortValueDescription(nv, 40));
+      DDToast(@"Kaydedildi ✓");
+    } else if (idx == 2) {
+      [[NSUserDefaults standardUserDefaults] removeObjectForKey:key];
+      [[NSUserDefaults standardUserDefaults] synchronize];
+      DDLog(@"🔧 Defaults silindi: %@", key);
+      DDToast(@"Anahtar silindi");
+    }
     [ws reload];
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Sil" style:UIAlertActionStyleDestructive
-                                    handler:^(UIAlertAction *_) {
-    [[NSUserDefaults standardUserDefaults] removeObjectForKey:key];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-    DDLog(@"🔧 Defaults silindi: %@", key);
-    [ws reload];
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-  [self presentViewController:a animated:YES completion:nil];
+  });
 }
 
 - (void)addKey:(id)sender {
-  UIAlertController *a = [UIAlertController
-      alertControllerWithTitle:@"Yeni anahtar"
-                       message:@"Anahtar adı ve değer (true/false, sayı veya metin)"
-                preferredStyle:UIAlertControllerStyleAlert];
-  [a addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-    tf.placeholder = @"anahtar (örn: gold)";
-  }];
-  [a addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-    tf.placeholder = @"değer (örn: 99999)";
-  }];
   __weak typeof(self) ws = self;
-  [a addAction:[UIAlertAction actionWithTitle:@"Ekle" style:UIAlertActionStyleDefault
-                                    handler:^(UIAlertAction *_) {
-    NSString *k = a.textFields[0].text;
+  DDInputPanelShow(@"Yeni anahtar",
+                   @"Anahtar adı ve değer (true/false, sayı veya metin)",
+                   @[@{ @"placeholder": @"anahtar (örn: gold)" },
+                     @{ @"placeholder": @"değer (örn: 99999)" }],
+                   @"Ekle", nil, ^(NSInteger idx, NSArray<NSString *> *values) {
+    if (idx != 1) return;
+    NSString *k = values[0];
     if (k.length == 0) return;
-    id v = DDInferValueFromString(a.textFields[1].text);
+    id v = DDInferValueFromString(values[1]);
     [[NSUserDefaults standardUserDefaults] setObject:v forKey:k];
     [[NSUserDefaults standardUserDefaults] synchronize];
     DDLog(@"🔧 Defaults eklendi: %@ = %@", k, DDShortValueDescription(v, 40));
+    DDToast(@"Eklendi ✓");
     [ws reload];
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-  [self presentViewController:a animated:YES completion:nil];
+  });
 }
 
 @end

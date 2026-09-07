@@ -43,17 +43,19 @@ static BOOL dd_swizzle_instance_method(Class cls, SEL sel, IMP newImp, IMP *orig
 
 static void dd_note_read(NSString *path, NSString *kind, BOOL capture) {
   if (path.length == 0) return;
+  // hızlı yol: hiçbir şey açık değilse iş yapma
+  if (!dd_settings_cache.fileLogging && !dd_settings_cache.autoCapture) return;
   if (DDThreadGuardActive() || DDOnOurIOQueue()) return;
   BOOL relevant = [path hasPrefix:[DDCore homePath]] || [path hasPrefix:[DDCore bundlePath]];
-  if (!relevant && ![DDCore verboseLog]) return;
+  if (!relevant && !dd_settings_cache.verboseLog) return;
 
   NSString *p = [path copy];
   NSString *k = [kind copy];
   dispatch_async([DDCore ioQueue], ^{
     DD_GUARD_CURRENT_BLOCK;
     [DDCore noteAccess:p kind:k];
-    if ([DDCore fileLogging]) DDLogEvent(k, p, nil);
-    if (capture) [DDCore captureNowIfNeeded:p];
+    if (dd_settings_cache.fileLogging) DDLogEvent(k, p, nil);
+    if (capture && dd_settings_cache.autoCapture) [DDCore captureNowIfNeeded:p];
   });
 }
 
@@ -119,7 +121,8 @@ static UIImage *dd_imageWithContentsOfFile(id self, SEL _cmd, NSString *path) {
 typedef UIImage *(*UIImageNameFn)(id, SEL, NSString *);
 static UIImageNameFn orig_imageNamed;
 static UIImage *dd_imageNamed(id self, SEL _cmd, NSString *name) {
-  if (name.length > 0 && [DDCore fileLogging] && !DDThreadGuardActive() && !DDOnOurIOQueue()) {
+  if (name.length > 0 && dd_settings_cache.fileLogging &&
+      !DDThreadGuardActive() && !DDOnOurIOQueue()) {
     DDLogEvent(@"IMAGE", name, nil);
   }
   return orig_imageNamed(self, _cmd, name);
@@ -164,7 +167,7 @@ static NSData *dd_contentsAtPath(id self, SEL _cmd, NSString *path) {
 typedef BOOL (*FMCopyFn)(id, SEL, NSString *, NSString *, NSError **);
 static FMCopyFn orig_copyItemAtPath;
 static BOOL dd_copyItemAtPath(id self, SEL _cmd, NSString *src, NSString *dst, NSError **err) {
-  if (src.length > 0 && [DDCore fileLogging] && !DDThreadGuardActive() && !DDOnOurIOQueue()) {
+  if (src.length > 0 && dd_settings_cache.fileLogging && !DDThreadGuardActive() && !DDOnOurIOQueue()) {
     DDLogEvent(@"COPY", src, dst);
   }
   return orig_copyItemAtPath(self, _cmd, src, dst, err);
@@ -172,7 +175,7 @@ static BOOL dd_copyItemAtPath(id self, SEL _cmd, NSString *src, NSString *dst, N
 
 static FMCopyFn orig_moveItemAtPath;
 static BOOL dd_moveItemAtPath(id self, SEL _cmd, NSString *src, NSString *dst, NSError **err) {
-  if (src.length > 0 && [DDCore fileLogging] && !DDThreadGuardActive() && !DDOnOurIOQueue()) {
+  if (src.length > 0 && dd_settings_cache.fileLogging && !DDThreadGuardActive() && !DDOnOurIOQueue()) {
     DDLogEvent(@"MOVE", src, dst);
   }
   return orig_moveItemAtPath(self, _cmd, src, dst, err);

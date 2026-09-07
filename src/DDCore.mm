@@ -8,7 +8,23 @@
 #include <sys/stat.h>
 #include <mach-o/dyld.h>
 
-NSString *const DDVersionString = @"1.0.0";
+NSString *const DDVersionString = @"2.1.0";
+
+#pragma mark - Ayar önbelleği (hot-path)
+
+DDSettingsCache dd_settings_cache = {1, 0, 1, 0, 1, 1, 1, 1};
+
+void DDRefreshSettingsCache(void) {
+  NSDictionary *d = [[NSUserDefaults standardUserDefaults] dictionaryRepresentation];
+  dd_settings_cache.autoCapture    = [d[@"dd.autocapture"] boolValue] ? 1 : 0;
+  dd_settings_cache.captureSandbox = [d[@"dd.capturesandbox"] boolValue] ? 1 : 0;
+  dd_settings_cache.fileLogging    = [d[@"dd.filelog"] boolValue] ? 1 : 0;
+  dd_settings_cache.verboseLog     = [d[@"dd.verbose"] boolValue] ? 1 : 0;
+  dd_settings_cache.netLogging     = [d[@"dd.netlog"] boolValue] ? 1 : 0;
+  dd_settings_cache.zipAfterDump   = [d[@"dd.makezip"] boolValue] ? 1 : 0;
+  dd_settings_cache.ipaBuild       = [d[@"dd.ipabuild"] boolValue] ? 1 : 0;
+  dd_settings_cache.ovMaster       = [d[@"dd.ovmaster"] boolValue] ? 1 : 0;
+}
 
 #pragma mark - Thread guard
 
@@ -66,6 +82,17 @@ static NSDateFormatter *dd_filename_formatter(void) {
   static dispatch_once_t once;
   dispatch_once(&once, ^{
     q = dispatch_queue_create("ddumper.io", DISPATCH_QUEUE_SERIAL);
+    dispatch_queue_set_specific(q, dd_io_queue_key, (void *)dd_io_queue_marker, NULL);
+  });
+  return q;
+}
+
++ (dispatch_queue_t)dumpQueue {
+  static dispatch_queue_t q = nil;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    q = dispatch_queue_create("ddumper.dump", DISPATCH_QUEUE_SERIAL);
+    // dump kuyruğu da kendi IO'muz sayılır → hook'lar kaydetmez/yakalamaz
     dispatch_queue_set_specific(q, dd_io_queue_key, (void *)dd_io_queue_marker, NULL);
   });
   return q;
@@ -306,6 +333,7 @@ void DDLogEvent(NSString *kind, NSString *path, NSString *extra) {
 + (void)setBoolSetting:(NSString *)key value:(BOOL)v {
   [[NSUserDefaults standardUserDefaults] setBool:v forKey:key];
   [[NSUserDefaults standardUserDefaults] synchronize];
+  DDRefreshSettingsCache();
 }
 + (void)setAutoCapture:(BOOL)v   { [DDCore setBoolSetting:@"dd.autocapture" value:v]; }
 + (void)setCaptureSandbox:(BOOL)v{ [DDCore setBoolSetting:@"dd.capturesandbox" value:v]; }
@@ -356,7 +384,7 @@ static NSMutableDictionary<NSString *, NSMutableDictionary *> *dd_stats = nil;
 + (void)maybeCapturePath:(NSString *)path {
   if (path.length == 0) return;
   if (DDThreadGuardActive() || DDOnOurIOQueue()) return;
-  if (![DDCore autoCapture]) return;
+  if (!dd_settings_cache.autoCapture) return;
 
   NSString *bundle = [DDCore bundlePath];
   NSString *home = [DDCore homePath];
@@ -534,6 +562,21 @@ static NSMutableDictionary<NSString *, NSMutableDictionary *> *dd_stats = nil;
                           [DDCore overridesPath]]) {
     [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
   }
+  DDRefreshSettingsCache();
+
+  // Ayar önbelleğini periyodik yenile (dışarıdan değiştirilirse diye)
+  static dispatch_source_t timer = nil;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, [DDCore ioQueue]);
+    dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)),
+                              (uint64_t)(3 * NSEC_PER_SEC), (uint64_t)(1 * NSEC_PER_SEC));
+    dispatch_source_set_event_handler(timer, ^{
+      DD_GUARD_CURRENT_BLOCK;
+      DDRefreshSettingsCache();
+    });
+    dispatch_resume(timer);
+  });
   DDLog(@"════════════════════════════════════════════");
   DDLog(@"🛠 DDumper %@ yüklendi", DDVersionString);
   DDLog(@"   Uygulama : %@ (%@)", [DDCore appName], [DDCore bundleID]);

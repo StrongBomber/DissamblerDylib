@@ -25,6 +25,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// Şu ana kadar eklenen toplam (sıkıştırmasız) byte.
 @property (nonatomic, readonly) unsigned long long totalBytes;
 
+/// (Opsiyonel) her dosya eklendiğinde çağrılır: (dosyaSayısı, byte)
+@property (nonatomic, copy, nullable) void (^progressHandler)(NSUInteger files, unsigned long long bytes);
+
 @end
 
 NS_ASSUME_NONNULL_END

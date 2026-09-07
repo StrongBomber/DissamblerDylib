@@ -29,6 +29,39 @@
 #define PATH_MAX 1024
 #endif
 
+#include <atomic>
+
+#pragma mark - Olay seli kontrolü (throttle)
+
+// Çok yoğun oyunlarda her open() için görev sıraya koymak kuyruğu şişirir.
+// Bekleyen görev sayısı üst sınıra vurunca yeni olaylar düşürülür ve
+// periyodik olarak kaç olayın atlandığı loglanır.
+static std::atomic<int32_t> dd_pending_events{0};
+static std::atomic<int32_t> dd_dropped_events{0};
+
+static BOOL dd_try_enqueue(void) {
+  int32_t cur = dd_pending_events.load(std::memory_order_relaxed);
+  while (cur < 512) {
+    if (dd_pending_events.compare_exchange_weak(cur, cur + 1,
+                                                std::memory_order_relaxed)) {
+      return YES;
+    }
+  }
+  dd_dropped_events.fetch_add(1, std::memory_order_relaxed);
+  return NO;
+}
+
+static void dd_dequeue_done(void) {
+  dd_pending_events.fetch_sub(1, std::memory_order_relaxed);
+}
+
+static void dd_report_dropped(void) {
+  int32_t n = dd_dropped_events.exchange(0, std::memory_order_relaxed);
+  if (n > 0) {
+    DDLog(@"⏳ Yoğunluk: %d dosya olayı atlandı (oyun performansı için)", n);
+  }
+}
+
 // DDOverride.mm içinde tanımlı hızlı C arayüzü
 BOOL DDOverrideResolveC(const char *path, char *out, size_t outsz);
 
@@ -67,11 +100,19 @@ static void dd_cache_paths(void) {
 /// Bu yolu kayda değer mi? (yüksek frekanslı çağrılar için ucuz tutulur)
 static bool dd_should_record(const char *path) {
   if (!path || !path[0]) return false;
+  // HIZLI YOL: log da capture de kapalıysa hiç iş yapma
+  if (!dd_settings_cache.fileLogging && !dd_settings_cache.autoCapture) return false;
   if (DDThreadGuardActive() || DDOnOurIOQueue()) return false; // kendi işlemlerimiz
-  if (dd_c_home_len > 0 && strncmp(path, dd_c_home, dd_c_home_len) == 0) return true;
-  if (dd_c_bundle_len > 0 && strncmp(path, dd_c_bundle, dd_c_bundle_len) == 0) return true;
+  if (dd_c_home_len > 0 && strncmp(path, dd_c_home, dd_c_home_len) == 0) {
+    if (dd_settings_cache.fileLogging || dd_settings_cache.autoCapture) return true;
+    return false;
+  }
+  if (dd_c_bundle_len > 0 && strncmp(path, dd_c_bundle, dd_c_bundle_len) == 0) {
+    if (dd_settings_cache.fileLogging || dd_settings_cache.autoCapture) return true;
+    return false;
+  }
   // /System, /usr, /Developer... yalnız verbose modda
-  return [DDCore verboseLog];
+  return dd_settings_cache.verboseLog != 0;
 }
 
 #pragma mark - Canlı düzenleme (override) yönlendirmesi
@@ -95,16 +136,19 @@ static void dd_record(const char *kind, const char *path, const char *extra, boo
   if (!p) p = [NSString stringWithCString:path encoding:NSISOLatin1StringEncoding];
   if (!p) return;
 
+  if (!dd_try_enqueue()) return; // kuyruk dolu → atla (lag önleme)
+
   NSString *k = [NSString stringWithUTF8String:kind];
   NSString *e = extra ? [NSString stringWithUTF8String:extra] : nil;
 
   dispatch_async([DDCore ioQueue], ^{
     DD_GUARD_CURRENT_BLOCK;
+    dd_dequeue_done();
     [DDCore noteAccess:p kind:k];
-    if ([DDCore fileLogging]) {
+    if (dd_settings_cache.fileLogging) {
       DDLogEvent(k, p, e);
     }
-    if (readOnly) {
+    if (readOnly && dd_settings_cache.autoCapture) {
       [DDCore captureNowIfNeeded:p];
     }
   });
@@ -213,7 +257,7 @@ static int dd_dlopen_preflight(const char *path, int mode) {
 }
 
 static int dd_stat(const char *path, struct stat *st) {
-  if ([DDCore verboseLog]) dd_record("STAT", path, NULL, false);
+  if (dd_settings_cache.verboseLog) dd_record("STAT", path, NULL, false);
   const char *eff = path;
   char redir[PATH_MAX];
   eff = dd_redirect_read(path, redir, sizeof(redir)); // boyut tutarlılığı için
@@ -221,7 +265,7 @@ static int dd_stat(const char *path, struct stat *st) {
 }
 
 static int dd_lstat(const char *path, struct stat *st) {
-  if ([DDCore verboseLog]) dd_record("LSTAT", path, NULL, false);
+  if (dd_settings_cache.verboseLog) dd_record("LSTAT", path, NULL, false);
   const char *eff = path;
   char redir[PATH_MAX];
   eff = dd_redirect_read(path, redir, sizeof(redir));
@@ -229,12 +273,12 @@ static int dd_lstat(const char *path, struct stat *st) {
 }
 
 static int dd_access(const char *path, int mode) {
-  if ([DDCore verboseLog]) dd_record("ACCESS", path, NULL, false);
+  if (dd_settings_cache.verboseLog) dd_record("ACCESS", path, NULL, false);
   return orig_access(path, mode);
 }
 
 static DIR *dd_opendir(const char *path) {
-  if ([DDCore verboseLog]) dd_record("OPENDIR", path, NULL, false);
+  if (dd_settings_cache.verboseLog) dd_record("OPENDIR", path, NULL, false);
   return orig_opendir(path);
 }
 
@@ -251,7 +295,7 @@ static int dd_rename(const char *from, const char *to) {
 }
 
 static int dd_mkdir(const char *path, mode_t mode) {
-  if ([DDCore verboseLog]) dd_record("MKDIR", path, NULL, false);
+  if (dd_settings_cache.verboseLog) dd_record("MKDIR", path, NULL, false);
   return orig_mkdir(path, mode);
 }
 
@@ -274,7 +318,7 @@ static int dd_sqlite3_open_v2(const char *path, void **db, int flags, const char
 }
 
 static int dd_connect(int s, const struct sockaddr *name, socklen_t namelen) {
-  if ([DDCore netLogging] && name && !DDThreadGuardActive() && !DDOnOurIOQueue()) {
+  if (dd_settings_cache.netLogging && name && !DDThreadGuardActive() && !DDOnOurIOQueue()) {
     char dst[128];
     dst[0] = '\0';
     if (name->sa_family == AF_INET && namelen >= sizeof(struct sockaddr_in)) {
@@ -330,4 +374,18 @@ void DDInstallCHooks(void) {
   size_t n = sizeof(rebs) / sizeof(rebs[0]);
   int rc = rebind_symbols(rebs, n);
   DDLog(@"🔗 fishhook: %zu sembol bağlandı (%@)", n, rc == 0 ? @"tamam" : @"hata");
+
+  // atlanan olay sayısını periyodik raporla
+  static dispatch_source_t t = nil;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{
+    t = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, [DDCore ioQueue]);
+    dispatch_source_set_timer(t, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC)),
+                              (uint64_t)(10 * NSEC_PER_SEC), (uint64_t)(1 * NSEC_PER_SEC));
+    dispatch_source_set_event_handler(t, ^{
+      DD_GUARD_CURRENT_BLOCK;
+      dd_report_dropped();
+    });
+    dispatch_resume(t);
+  });
 }

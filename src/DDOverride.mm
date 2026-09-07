@@ -92,11 +92,11 @@ BOOL DDOverrideResolveC(const char *path, char *out, size_t outsz) {
 #pragma mark Durum
 
 + (BOOL)masterEnabled {
-  return [DDCore boolSetting:@"dd.ovmaster" default:YES];
+  return dd_settings_cache.ovMaster != 0;
 }
 
 + (void)setMasterEnabled:(BOOL)on {
-  [DDCore setBoolSetting:@"dd.ovmaster" value:on];
+  [DDCore setBoolSetting:@"dd.ovmaster" value:on];  // önbelleği de tazeler
   DDLog(on ? @"✏️ Canlı düzenleme ANAHTARI AÇIK (yönlendirme aktif)"
            : @"⏸ Canlı düzenleme anahtarı KAPALI (yönlendirme durdu)");
 }

@@ -17,10 +17,15 @@ void DDAlertOnMain(NSString *title, NSString *message); // arka plandan güvenil
 void DDShareURL(NSURL *url);
 void DDShareText(NSString *text, NSString *fileName);
 
-/// Uzun işlemler için basit uyarı-tabanlı progress (tek seferde bir tane)
+/// Uzun işlemler için HUD (kendi penceresinde, sunum çakışması yok)
 void DDShowProgress(NSString *title);
+/// İptal düğmeli HUD
+void DDShowProgressCancellable(NSString *title, void (^ _Nullable cancel)(void));
 void DDUpdateProgress(NSString *msg);
 void DDHideProgress(void);
+
+/// Kısa bilgi balonu
+void DDToast(NSString *message);
 
 /// NSString'i NSUserDefaults'ta saklanabilir türe dönüştürür (bool/sayı/metin)
 id DDInferValueFromString(NSString *s);

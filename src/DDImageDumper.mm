@@ -131,15 +131,6 @@ static BOOL dd_find_arm64_slice(const uint8_t *data, size_t len, uint32_t *off, 
   return NO;
 }
 
-static NSString *dd_realpath(NSString *path) {
-  if (path.length == 0) return path;
-  char buf[PATH_MAX];
-  if (realpath(path.fileSystemRepresentation, buf)) {
-    return [NSString stringWithUTF8String:buf] ?: path;
-  }
-  return path;
-}
-
 #pragma mark - DDLoadedImage
 
 @interface DDLoadedImage ()
@@ -199,7 +190,13 @@ static NSString *dd_realpath(NSString *path) {
 
 + (NSArray<DDLoadedImage *> *)loadedImages {
   DD_GUARD_CURRENT_BLOCK;
-  NSString *mainExec = dd_realpath([DDCore executablePath]);
+  // DİKKAT: dyld görüntü listesinde indeks 0 HER ZAMAN ana çalıştırılabilirdir.
+  // (realpath karşılaştırması /private -> / var gibi nedenlerle yanılırdı)
+  NSString *mainExec = nil;
+  {
+    const char *n0 = _dyld_get_image_name(0);
+    if (n0) mainExec = [NSString stringWithUTF8String:n0];
+  }
 
   uint32_t count = _dyld_image_count();
   NSMutableArray *arr = [NSMutableArray arrayWithCapacity:count];
@@ -212,8 +209,8 @@ static NSString *dd_realpath(NSString *path) {
     DDLoadedImage *img = [[DDLoadedImage alloc] initWithPath:path
                                                        header:hdr
                                                         slide:_dyld_get_image_vmaddr_slide(i)];
-    if ([dd_realpath(path) isEqualToString:mainExec]) {
-      img.isMainExecutable = YES;
+    if (i == 0) {
+      img.isMainExecutable = YES;  // liste başı = ana ikili (garantili)
     }
     [arr addObject:img];
   }

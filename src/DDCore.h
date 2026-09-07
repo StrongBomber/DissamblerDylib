@@ -10,6 +10,27 @@ NS_ASSUME_NONNULL_BEGIN
 
 extern NSString *const DDVersionString;
 
+#pragma mark - C seviyesi ayar önbelleği (hot-path, NSUserDefaults YOK)
+
+/// Her open() çağrısında NSUserDefaults okumak ciddi lag yaratır;
+/// bu nedenle ayarlar bu atomik struct'ta önbelleklenir ve
+/// düzenli aralıklarla / değişimde yenilenir.
+typedef struct DDSettingsCache {
+  volatile int32_t autoCapture;
+  volatile int32_t captureSandbox;
+  volatile int32_t fileLogging;
+  volatile int32_t verboseLog;
+  volatile int32_t netLogging;
+  volatile int32_t zipAfterDump;
+  volatile int32_t ipaBuild;
+  volatile int32_t ovMaster;
+} DDSettingsCache;
+
+extern DDSettingsCache dd_settings_cache;
+
+static inline BOOL DDCached(volatile int32_t *f) { return *f != 0; }
+void DDRefreshSettingsCache(void);
+
 #pragma mark - Thread guard (hook'ların kendi işlemlerini yakalamasını engeller)
 
 /// Bu thread-local guard aktifken dosya erişim hook'ları log/capture yapmaz.
@@ -81,6 +102,8 @@ void DDLogEvent(NSString *kind, NSString * _Nullable path, NSString * _Nullable 
 
 #pragma mark - io kuyruğu (tüm ağırlık işleri burada, guard'lı çalışır)
 + (dispatch_queue_t)ioQueue;
+/// Uzun dump işleri için AYRI kuyruk — konsol/log akışı asla bloklanmaz.
++ (dispatch_queue_t)dumpQueue;
 
 #pragma mark Yakalama (auto-capture)
 /// path bir oyundosyasıysa (bundle / sandbox) Captured altına kopyalar (io kuyruğunda, async).

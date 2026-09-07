@@ -37,6 +37,22 @@ typedef void (^DDZipCompletion)(NSString * _Nullable zipPath, NSError * _Nullabl
 /// <dir>/Reports altına yazar. Smart dump da kullanır.
 + (void)writeReportsToDirectory:(NSString *)dir;
 
+#pragma mark - İptal / ön kontrol
+/// Devam eden dump'i iptal eder (HUD'daki İptal düğmesi bunu çağırır).
++ (void)cancelCurrentDump;
++ (void)resetCancel;
++ (BOOL)isCancelled;
+/// needed byte için disk yeterli değilse açıklayıcı mesaj, yoksa nil.
++ (nullable NSString *)diskProblemForBytes:(unsigned long long)needed;
+
+#pragma mark - Sağlam ağaç kopyalayıcı
+/// Hata toleranslı, sembolik bağ destekli, iptal edilebilir kopyalayıcı.
+/// failedItems verilirse kopyalanamayan göreli yollar doldurulur.
++ (BOOL)copyTreeFrom:(NSString *)src
+                  to:(NSString *)dst
+        failedItems:(NSMutableArray<NSString *> * _Nullable)failed
+            progress:(void (^ _Nullable)(NSUInteger done, NSUInteger total))progress;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -8,6 +8,7 @@
 #import "DDFeatures.h"
 #import "DDCore.h"
 #import "DDUICommon.h"
+#import "DDPanels.h"
 
 #import <sqlite3.h>
 
@@ -239,21 +240,13 @@ static NSArray *DDDBColumns(sqlite3 *db, NSString *table) {
 
 /// SQL, dosyanın GÜVENLİ BİR KOŞASINDA çalıştırılır (orijinal bozulmaz).
 - (void)runSQL:(id)sender {
-  UIAlertController *a = [UIAlertController
-      alertControllerWithTitle:@"SQL çalıştır (kopya üzerinde)"
-                       message:@"Örn: SELECT * FROM oyuncu LIMIT 10;  •  UPDATE ...  •  DELETE ..."
-                preferredStyle:UIAlertControllerStyleAlert];
-  [a addTextFieldWithConfigurationHandler:^(UITextField *tf) {
-    tf.font = DDMonoFont(12);
-    tf.placeholder = @"SQL ifadesi";
-  }];
   __weak typeof(self) ws = self;
-  [a addAction:[UIAlertAction actionWithTitle:@"Çalıştır" style:UIAlertActionStyleDefault
-                                    handler:^(UIAlertAction *_) {
-    [ws execSQL:a.textFields.firstObject.text];
-  }]];
-  [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
-  [self presentViewController:a animated:YES completion:nil];
+  DDInputPanelShow(@"SQL çalıştır (kopya üzerinde)",
+                   @"Örn: SELECT * FROM oyuncu LIMIT 10;\nUPDATE ... • DELETE ...",
+                   @[@{ @"placeholder": @"SQL ifadesi" }],
+                   @"Çalıştır", nil, ^(NSInteger idx, NSArray<NSString *> *values) {
+    if (idx == 1) [ws execSQL:values.firstObject];
+  });
 }
 
 - (void)execSQL:(NSString *)sql {
