@@ -1,0 +1,85 @@
+SDK: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk
+→ fishhook derleniyor (C)…
+→ DDumper derleniyor (Objective-C++)…
+src/DDImageDumper.mm:195:13: warning: variable 'mainExec' set but not used [-Wunused-but-set-variable]
+  NSString *mainExec = nil;
+            ^
+1 warning generated.
+src/DDPanels.mm:391:12: error: unknown type name 'doBrowse'
+    void (^doBrowse)(void) ^{
+           ^
+src/DDPanels.mm:391:20: error: expected expression
+    void (^doBrowse)(void) ^{
+                   ^
+src/DDPanels.mm:391:26: error: expected '(' for function-style cast or type construction
+    void (^doBrowse)(void) ^{
+                     ~~~~^
+src/DDPanels.mm:392:7: error: unexpected interface name 'DDBrowserVC': expected expression
+      DDBrowserVC *vc = [[DDBrowserVC alloc] initWithPath:browseDir];
+      ^
+src/DDPanels.mm:392:20: error: use of undeclared identifier 'vc'
+      DDBrowserVC *vc = [[DDBrowserVC alloc] initWithPath:browseDir];
+                   ^
+src/DDPanels.mm:414:28: error: use of undeclared identifier 'doBrowse'
+        else if (idx == 1) doBrowse();
+                           ^
+6 errors generated.
+src/DDUI.mm:103:7: error: dereferencing a __weak pointer is not allowed due to possible null value caused by race condition, assign it to strong variable first
+      ws->_loadedData = data;
+      ^
+src/DDUI.mm:118:7: error: dereferencing a __weak pointer is not allowed due to possible null value caused by race condition, assign it to strong variable first
+      ws->_isSqlite = (data.length >= 15 &&
+      ^
+src/DDUI.mm:120:11: error: dereferencing a __weak pointer is not allowed due to possible null value caused by race condition, assign it to strong variable first
+      if (ws->_isSqlite) {
+          ^
+src/DDUI.mm:127:9: error: dereferencing a __weak pointer is not allowed due to possible null value caused by race condition, assign it to strong variable first
+        ws->_decodedImage = [UIImage imageWithData:data];
+        ^
+src/DDUI.mm:129:7: error: dereferencing a __weak pointer is not allowed due to possible null value caused by race condition, assign it to strong variable first
+      ws->_isImage = (ws->_decodedImage != nil);
+      ^
+src/DDUI.mm:129:23: error: dereferencing a __weak pointer is not allowed due to possible null value caused by race condition, assign it to strong variable first
+      ws->_isImage = (ws->_decodedImage != nil);
+                      ^
+src/DDUI.mm:132:7: error: dereferencing a __weak pointer is not allowed due to possible null value caused by race condition, assign it to strong variable first
+      ws->_loadedText = [ws decodeText:data];
+      ^
+src/DDUI.mm:331:5: error: use of undeclared identifier '_rootPath'
+    _rootPath = [path copy];
+    ^
+src/DDUI.mm:332:5: error: use of undeclared identifier '_currentPath'
+    _currentPath = [path copy];
+    ^
+src/DDUI.mm:340:21: error: property 'currentPath' not found on object of type 'DDBrowserVC *'
+  self.title = self.currentPath.lastPathComponent.length
+                    ^
+src/DDUI.mm:341:14: error: property 'currentPath' not found on object of type 'DDBrowserVC *'
+      ? self.currentPath.lastPathComponent : @"/";
+             ^
+src/DDUI.mm:343:8: error: property 'table' not found on object of type 'DDBrowserVC *'
+  self.table = [[UITableView alloc] initWithFrame:self.view.bounds style:DDTableStyle()];
+       ^
+src/DDUI.mm:344:8: error: property 'table' not found on object of type 'DDBrowserVC *'
+  self.table.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+       ^
+src/DDUI.mm:345:8: error: property 'table' not found on object of type 'DDBrowserVC *'
+  self.table.dataSource = self;
+       ^
+src/DDUI.mm:346:8: error: property 'table' not found on object of type 'DDBrowserVC *'
+  self.table.delegate = self;
+       ^
+src/DDUI.mm:347:8: error: property 'table' not found on object of type 'DDBrowserVC *'
+  self.table.rowHeight = 52;
+       ^
+src/DDUI.mm:349:8: error: property 'searchBar' not found on object of type 'DDBrowserVC *'
+  self.searchBar = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
+       ^
+src/DDUI.mm:350:8: error: property 'searchBar' not found on object of type 'DDBrowserVC *'
+  self.searchBar.placeholder = @"Ara…";
+       ^
+src/DDUI.mm:351:8: error: property 'searchBar' not found on object of type 'DDBrowserVC *'
+  self.searchBar.delegate = self;
+       ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+20 errors generated.
