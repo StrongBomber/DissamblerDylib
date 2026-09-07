@@ -1,0 +1,40 @@
+SDK: /Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk
+→ fishhook derleniyor (C)…
+→ Lua 5.3.6 indiriliyor…
+  kaynak: https://www.lua.org/ftp/lua-5.3.6.tar.gz
+  kaynak: /tmp/lua_x/lua-5.3.6/src/
+→ Lua derleniyor (C)…
+→ DDumper derleniyor (Objective-C++)…
+src/DDImageDumper.mm:197:13: warning: variable 'mainExec' set but not used [-Wunused-but-set-variable]
+  NSString *mainExec = nil;
+            ^
+1 warning generated.
+src/DDUICommon.mm:58:49: warning: 'initForExportingURLs:asCopy:' is only available on iOS 14.0 or newer [-Wunguarded-availability-new]
+        [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url]
+                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Applications/Xcode_15.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS17.5.sdk/System/Library/Frameworks/UIKit.framework/Headers/UIDocumentPickerViewController.h:60:1: note: 'initForExportingURLs:asCopy:' has been marked as being introduced in iOS 14.0 here, but the deployment target is iOS 12.0.0
+- (instancetype)initForExportingURLs:(NSArray <NSURL *> *)urls asCopy:(BOOL)asCopy NS_DESIGNATED_INITIALIZER API_AVAILABLE(ios(14.0)) API_UNAVAILABLE(tvos);
+^
+src/DDUICommon.mm:58:49: note: enclose 'initForExportingURLs:asCopy:' in an @available check to silence this warning
+        [[UIDocumentPickerViewController alloc] initForExportingURLs:@[url]
+                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+src/DDPanels.mm:54:17: warning: unused function 'DDPanelBg' [-Wunused-function]
+static UIColor *DDPanelBg(void)   { return [UIColor colorWithWhite:0.07 alpha:0.97]; }
+                ^
+1 warning generated.
+src/DDIl2Cpp.mm:514:9: warning: format specifies type 'char *' but the argument has type 'NSString *' [-Wformat]
+        runtime ? @"" : @" (runtime yok — sadece metadata)",
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/DDIl2Cpp.mm:516:9: warning: format specifies type 'char *' but the argument has type 'NSString *' [-Wformat]
+        metaNote ? [NSString stringWithFormat:@" (%@)", metaNote] : @"",
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2 warnings generated.
+src/DDScript.mm:28:10: fatal error: 'lua.h' file not found
+#include "lua.h"
+         ^~~~~~~
+1 error generated.
+src/DDUI.mm:1690:31: warning: unused variable 'ws' [-Wunused-variable]
+  __weak DDOverlayController *ws = self;
+                              ^
+1 warning generated.
