@@ -1687,7 +1687,6 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
     nav.modalPresentationStyle = UIModalPresentationPageSheet;
   }
   [DDOverlayRoot panelWillAppear];  // klavye/başvuru için pencereyi key yap
-  __weak DDOverlayController *ws = self;
   menu.onDismiss = ^{ [DDOverlayRoot panelDidDisappear]; };
   [root presentViewController:nav animated:YES completion:nil];
 }

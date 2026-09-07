@@ -69,6 +69,7 @@ done
 echo "→ DDumper derleniyor (Objective-C++)…" 
 xcrun -sdk iphoneos clang++ -arch arm64 -isysroot "$SDK" \
   -miphoneos-version-min="$MIN_IOS" \
+  -Isrc/lua \
   -std=gnu++17 -fobjc-arc -O2 \
   -Wall -Wno-unused-parameter -Wno-deprecated-declarations \
   -framework Foundation -framework UIKit -framework CoreGraphics -framework QuartzCore \
