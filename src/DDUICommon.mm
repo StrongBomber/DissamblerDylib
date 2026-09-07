@@ -20,16 +20,24 @@ UIFont *DDMonoFont(CGFloat size) {
 UIViewController *DDTopMostVC(void) {
   UIViewController *vc = [UIApplication sharedApplication].keyWindow.rootViewController;
   if (!vc) {
-    // UIWindowScene tabanlı uygulamalar
-    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
-      if ([scene isKindOfClass:[UIWindowScene class]]) {
-        UIWindowScene *ws = (UIWindowScene *)scene;
-        if (ws.keyWindow.rootViewController) {
-          vc = ws.keyWindow.rootViewController;
-          break;
-        }
-        for (UIWindow *w in ws.windows) {
-          if (w.rootViewController) { vc = w.rootViewController; break; }
+    // UIWindowScene tabanlı uygulamalar (iOS 13+)
+    if (@available(iOS 13.0, *)) {
+      for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) {
+          UIWindowScene *ws = (UIWindowScene *)scene;
+          UIWindow *kw = nil;
+          if (@available(iOS 15.0, *)) {
+            kw = ws.keyWindow;
+          }
+          if (!kw) {
+            for (UIWindow *w in ws.windows) {
+              if (w.rootViewController) { kw = w; break; }
+            }
+          }
+          if (kw.rootViewController) {
+            vc = kw.rootViewController;
+            break;
+          }
         }
       }
     }
