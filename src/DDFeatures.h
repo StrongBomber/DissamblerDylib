@@ -7,6 +7,12 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+#pragma mark - Önizleme (DDUI.mm içinde, ortak kullanım için burada bildirilir)
+
+@interface DDPreviewVC : UIViewController
+- (instancetype)initWithFile:(NSString *)path;
+@end
+
 #pragma mark - Canlı Düzenleme (DDExEditor.mm)
 
 /// Metin/plist editörü. Kaydettiğinde dosya sandbox'taysa YERİNDE,

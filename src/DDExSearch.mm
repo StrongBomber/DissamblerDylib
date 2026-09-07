@@ -220,13 +220,8 @@
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
   [tableView deselectRowAtIndexPath:indexPath animated:YES];
-  // önizleme ekranı DDUI'de; basit çözüm: analiz ekranıyla aç
-  Class previewCls = NSClassFromString(@"DDPreviewVC");
-  if (previewCls) {
-    id vc = [[previewCls alloc] performSelector:@selector(initWithFile:)
-                                     withObject:self.results[indexPath.row].path];
-    [self.navigationController pushViewController:vc animated:YES];
-  }
+  DDPreviewVC *vc = [[DDPreviewVC alloc] initWithFile:self.results[indexPath.row].path];
+  [self.navigationController pushViewController:vc animated:YES];
 }
 
 @end

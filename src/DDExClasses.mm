@@ -18,11 +18,11 @@
 
 static NSArray<NSString *> *DDAllClassNames(BOOL appOnly) {
   unsigned int count = 0;
-  const char **names = objc_copyClassNamesList(&count);
+  Class *classes = objc_copyClassList(&count);
   NSMutableArray *out = [NSMutableArray arrayWithCapacity:count];
   NSString *bundle = [DDCore bundlePath];
   for (unsigned int i = 0; i < count; i++) {
-    Class cls = objc_getClass(names[i]);
+    Class cls = classes[i];
     if (!cls) continue;
     if (appOnly) {
       const char *img = class_getImageName(cls);
@@ -30,9 +30,10 @@ static NSArray<NSString *> *DDAllClassNames(BOOL appOnly) {
       NSString *image = [NSString stringWithUTF8String:img];
       if (![image hasPrefix:bundle]) continue;
     }
-    [out addObject:[NSString stringWithUTF8String:names[i]]];
+    const char *nm = class_getName(cls);
+    if (nm) [out addObject:[NSString stringWithUTF8String:nm]];
   }
-  if (names) free(names);
+  if (classes) free(classes);
   [out sortUsingSelector:@selector(localizedStandardCompare:)];
   return out;
 }
@@ -89,7 +90,7 @@ NSString *DDClassHeaderForName(NSString *className) {
   if (props) free(props);
 
   // Metotlar (instance + class)
-  for (BOOL isMeta = NO; isMeta <= YES; isMeta++) {
+  for (int isMeta = 0; isMeta <= 1; isMeta++) {
     Class target = isMeta ? object_getClass(cls) : cls;
     unsigned int mc = 0;
     Method *methods = class_copyMethodList(target, &mc);
@@ -98,7 +99,7 @@ NSString *DDClassHeaderForName(NSString *className) {
       const char *types = method_getTypeEncoding(methods[i]);
       [s appendFormat:@"%@ (%@)%@;\n",
           isMeta ? @"+" : @"-",
-          [NSString stringWithUTF8String:types ?: @"?"],
+          types ? [NSString stringWithUTF8String:types] : @"?",
           NSStringFromSelector(sel)];
     }
     if (methods) free(methods);

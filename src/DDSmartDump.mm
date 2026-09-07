@@ -132,7 +132,7 @@ static NSString *dd_write_text(NSString *path, NSString *text) {
     onMain(@"3/6 String'ler çıkarılıyor…");
     NSArray *strs = DDExtractStrings(mainOut, 6, 8000);
     NSMutableString *strReport = [NSMutableString stringWithFormat:
-        "# Strings — %@ (decrypted)\n# %lu string (min 6 karakter)\n\n",
+        @"# Strings — %@ (decrypted)\n# %lu string (min 6 karakter)\n\n",
         mainOut.lastPathComponent, (unsigned long)strs.count];
     for (NSString *s in strs) [strReport appendFormat:@"%@\n", s];
     dd_write_text([dir stringByAppendingPathComponent:@"strings_main.txt"], strReport);

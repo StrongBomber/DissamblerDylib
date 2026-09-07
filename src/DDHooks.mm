@@ -158,6 +158,7 @@ static int dd_openat(int dirfd, const char *path, int oflag, ...) {
     mode = (mode_t)va_arg(ap, int);
     va_end(ap);
   }
+  bool ro = ((oflag & O_ACCMODE) == O_RDONLY);
   // Tam yolu çöz (göreli path + dirfd)
   char full[PATH_MAX + 64];
   if (path && path[0] != '/') {
@@ -290,12 +291,13 @@ static int dd_connect(int s, const struct sockaddr *name, socklen_t namelen) {
       }
     }
     if (dst[0]) {
+      NSString *dstStr = [NSString stringWithUTF8String:dst];
       dispatch_async([DDCore ioQueue], ^{
         DD_GUARD_CURRENT_BLOCK;
-        [DDCore noteAccess:[NSString stringWithFormat:@"🌐 %@", [NSString stringWithUTF8String:dst]]
+        [DDCore noteAccess:[NSString stringWithFormat:@"🌐 %@", dstStr]
                        kind:@"NET"];
         if ([DDCore fileLogging]) {
-          DDLogEvent(@"NET", [NSString stringWithUTF8String:dst], nil);
+          DDLogEvent(@"NET", dstStr, nil);
         }
       });
     }

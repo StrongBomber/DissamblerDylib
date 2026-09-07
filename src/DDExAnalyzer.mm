@@ -11,6 +11,7 @@
 #import "DDOverride.h"
 #import "DDUICommon.h"
 
+#include <mach-o/fat.h>
 #include <mach-o/loader.h>
 #include <string.h>
 #include <zlib.h>
@@ -113,8 +114,8 @@ static NSArray<NSString *> *DDZipListing(NSString *path) {
                    ((uint32_t)b[p + 2] << 16) | ((uint32_t)b[p + 3] << 24);
     if (sig != 0x02014b50) break;
     uint16_t method = (uint16_t)(b[p + 10] | (b[p + 11] << 8));
-    uint32_t csize = (uint32_t)(b[p + 20] | (b[p + 21] << 8) | (b[p + 22] << 16) | (b[p + 23] << 24);
-    uint32_t usize = (uint32_t)(b[p + 24] | (b[p + 25] << 8) | (b[p + 26] << 16) | (b[p + 27] << 24);
+    uint32_t csize = (uint32_t)(b[p + 20] | (b[p + 21] << 8) | (b[p + 22] << 16) | (b[p + 23] << 24));
+    uint32_t usize = (uint32_t)(b[p + 24] | (b[p + 25] << 8) | (b[p + 26] << 16) | (b[p + 27] << 24));
     uint16_t nlen = (uint16_t)(b[p + 28] | (b[p + 29] << 8));
     if (p + 46 + nlen > tail.length) break;
     NSString *name = [[NSString alloc] initWithBytes:b + p + 46 length:nlen
@@ -127,7 +128,7 @@ static NSArray<NSString *> *DDZipListing(NSString *path) {
     }
     p += 46 + nlen;
     if (out.count >= 300) {
-      [out addObject:@"  … (liste 300 ile sınırlı)");
+      [out addObject:@"  … (liste 300 ile sınırlı)"];
       break;
     }
   }

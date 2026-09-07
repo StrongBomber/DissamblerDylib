@@ -56,6 +56,8 @@ void DDLogEvent(NSString *kind, NSString * _Nullable path, NSString * _Nullable 
 + (NSString *)reportsPath;       // <base>/Reports (tek dump sırasında oluşur)
 
 #pragma mark Settings (NSUserDefaults)
++ (BOOL)boolSetting:(NSString *)key default:(BOOL)def;      // iç yapı (DDOverride da kullanır)
++ (void)setBoolSetting:(NSString *)key value:(BOOL)v;
 + (BOOL)autoCapture;        + (void)setAutoCapture:(BOOL)v;   // oyun açtıkça otomatik kopyala
 + (BOOL)captureSandbox;     + (void)setCaptureSandbox:(BOOL)v;// sandbox içi dosyaları da yakala
 + (BOOL)fileLogging;        + (void)setFileLogging:(BOOL)v;   // erişim günlüğü

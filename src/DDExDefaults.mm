@@ -87,8 +87,8 @@
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-  static NSString *id = @"defrow";
-  UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:id];
+  static NSString *cid = @"defrow";
+  UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cid];
   if (!cell) {
     cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue2 reuseIdentifier:id];
     cell.textLabel.font = DDMonoFont(11);
@@ -112,7 +112,7 @@
       alertControllerWithTitle:key
                        message:[NSString stringWithFormat:@"Mevcut: %@\nYeni değer girin "
                                                          @"(true/false, sayı veya metin):",
-                                DDShortValueDescription(cur, 60]]
+                                DDShortValueDescription(cur, 60)]
                 preferredStyle:UIAlertControllerStyleAlert];
   [a addTextFieldWithConfigurationHandler:^(UITextField *tf) {
     tf.text = [cur description];

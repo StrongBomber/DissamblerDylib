@@ -432,7 +432,7 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
     DD_GUARD_CURRENT_BLOCK;
     NSArray *strs = DDExtractStrings(path, 5, 20000);
     NSMutableString *out = [NSMutableString stringWithFormat:
-        "# Strings: %@\n# %lu string\n\n", path.lastPathComponent, (unsigned long)strs.count];
+        @"# Strings: %@\n# %lu string\n\n", path.lastPathComponent, (unsigned long)strs.count];
     for (NSString *s in strs) [out appendFormat:@"%@\n", s];
     dispatch_async(dispatch_get_main_queue(), ^{
       DDHideProgress();
@@ -1128,18 +1128,11 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   UIAlertController *a = [UIAlertController
       alertControllerWithTitle:@"🔐 Akıllı Decrypt & IPA"
                        message:[NSString stringWithFormat:
-                                @"Şunlar üretilir:
-
-"
-                                @"• Ana ikili (bellekten, şifresi çözülmüş)
-"
-                                @"• Tüm framework/dylib'ler
-"
-                                @"• Strings + ObjC class-dump raporları
-"
-                                @"• %@ yeniden imzalanmaya hazır DECRYPTED IPA
-
-"
+                                @"Şunlar üretilir:\n\n"
+                                @"• Ana ikili (bellekten, şifresi çözülmüş)\n"
+                                @"• Tüm framework/dylib'ler\n"
+                                @"• Strings + ObjC class-dump raporları\n"
+                                @"• %@ yeniden imzalanmaya hazır DECRYPTED IPA\n\n"
                                 @"Devam edilsin?",
                                 [DDCore ipaBuild] ? @"ESign ile" : @""]
                 preferredStyle:UIAlertControllerStyleAlert];
@@ -1161,18 +1154,11 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
       DDAlert(@"Akıllı Dump Hatası", error.localizedDescription ?: @"?");
       return;
     }
-    NSMutableString *msg = [NSMutableString stringWithFormat:@"Hazır! 🎉
-
-Çıktı klasörü:
-%@
-", dir];
+    NSMutableString *msg = [NSMutableString stringWithFormat:
+        @"Hazır! 🎉\n\nÇıktı klasörü:\n%@\n", dir];
     if (ipaPath) {
-      [msg appendFormat:@"
-Decrypted IPA:
-%@
-
-(Bu IPA'yı ESign ile imzalayıp kurabilirsiniz — "
-                       @"FairPlay şifresi kaldırılmıştır.)", ipaPath];
+      [msg appendFormat:@"\nDecrypted IPA:\n%@\n\n(Bu IPA'yı ESign ile imzalayıp "
+                       @"kurabilirsiniz — FairPlay şifresi kaldırılmıştır.)", ipaPath];
     }
     DDLog(@"🔐 Akıllı dump bitti: %@", ipaPath ?: dir);
     UIAlertController *a = [UIAlertController alertControllerWithTitle:@"Tamamlandı"

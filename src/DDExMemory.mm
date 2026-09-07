@@ -439,8 +439,8 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
                 preferredStyle:UIAlertControllerStyleAlert];
   [a addTextFieldWithConfigurationHandler:^(UITextField *tf) {
     tf.keyboardType = UIKeyboardTypeNumbersAndPunctuation;
-    uint8_t cur[8];
     NSUInteger size = DDMemTypeSize(self.type);
+    uint8_t cur[8];
     if (DDMemRead(addr, cur, size)) {
       if (self.type == DDMemI32) { int32_t v; memcpy(&v, cur, 4); tf.text = [NSString stringWithFormat:@"%d", v]; }
       else if (self.type == DDMemI64) { int64_t v; memcpy(&v, cur, 8); tf.text = [NSString stringWithFormat:@"%lld", (long long)v]; }
@@ -451,13 +451,14 @@ static BOOL DDMemWrite(uint64_t addr, const void *data, NSUInteger size) {
   __weak typeof(self) ws = self;
   [a addAction:[UIAlertAction actionWithTitle:@"Yaz" style:UIAlertActionStyleDefault
                                     handler:^(UIAlertAction *_) {
-    uint8_t pat[8];
+    uint8_t *pat = (uint8_t *)malloc(8);
     NSUInteger size = DDMemTypeSize(self.type);
-    if (DDMemParseValue(a.textFields.firstObject.text, self.type, pat)) {
+    if (pat && DDMemParseValue(a.textFields.firstObject.text, self.type, pat)) {
       BOOL ok = DDMemWrite(addr, pat, size);
       DDLog(ok ? @"🧠 Bellek yazıldı: 0x%llX" : @"⚠️ Bellek yazılamadı: 0x%llX", addr);
       [ws.table reloadData];
     }
+    free(pat);
   }]];
   [a addAction:[UIAlertAction actionWithTitle:@"Vazgeç" style:UIAlertActionStyleCancel handler:nil]];
   [self presentViewController:a animated:YES completion:nil];
