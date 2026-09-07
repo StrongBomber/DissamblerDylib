@@ -1,0 +1,12 @@
+# Derleme çıktıları
+build/
+*.o
+*.dylib
+
+# macOS
+.DS_Store
+
+# Editörler
+*.swp
+.idea/
+.vscode/
