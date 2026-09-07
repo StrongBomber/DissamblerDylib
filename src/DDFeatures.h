@@ -7,6 +7,20 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+#pragma mark - Dosya tarayıcı (DDUI.mm içinde, ortak kullanım için burada bildirilir)
+
+@interface DDBrowserEntry : NSObject
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic, copy) NSString *path;
+@property (nonatomic) BOOL isDir;
+@property (nonatomic) unsigned long long size;
+@property (nonatomic, strong, nullable) NSDate *modified;
+@end
+
+@interface DDBrowserVC : UIViewController <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
+- (instancetype)initWithPath:(NSString *)path;
+@end
+
 #pragma mark - Önizleme (DDUI.mm içinde, ortak kullanım için burada bildirilir)
 
 @interface DDPreviewVC : UIViewController <UIScrollViewDelegate>

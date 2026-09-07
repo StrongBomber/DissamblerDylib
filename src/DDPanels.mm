@@ -5,6 +5,9 @@
 
 #import "DDPanels.h"
 #import "DDUI.h"
+#import "DDCore.h"
+#import "DDFeatures.h"
+#import "DDUICommon.h"
 
 #pragma mark - DDOverlayRoot
 
@@ -34,11 +37,11 @@ static NSInteger dd_panel_count = 0;
 + (void)panelDidDisappear {
   dd_panel_count = MAX(0, dd_panel_count - 1);
   if (dd_panel_count == 0) {
-    // Oyunun klavye/focus akışını geri ver
+    // Oyunun klavye/focus akışını geri ver (bizim penceremiz görünür kalır,
+    // ama KEY olmaktan çıkar → oyun ilk sınıf vatandaşlığa döner)
     if (dd_prev_key_window && dd_prev_key_window != [self window]) {
       [dd_prev_key_window makeKeyWindow];
     }
-    [[self window] makeKeyAndVisible]; // kendi penceremiz hâlâ görünür (buton için)
     [DDProgressHUD hide];
   }
 }
@@ -278,6 +281,141 @@ static void dd_dismiss_card(UIView *card, void (^done)(void)) {
     } else if (done) {
       done();
     }
+  });
+}
+
+#pragma mark Sonuç panosu
+
+void DDResultPanel(NSString *title, NSString *path) {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    NSFileManager *fm = [[NSFileManager alloc] init];
+    BOOL isDir = NO;
+    BOOL exists = [fm fileExistsAtPath:path isDirectory:&isDir];
+    NSDictionary *attrs = [fm attributesOfItemAtPath:path error:nil];
+    unsigned long long size = isDir ? [DDCore folderSize:path] : [attrs fileSize];
+
+    NSString *ext = path.pathExtension.lowercaseString;
+    NSString *icon = isDir ? @"📂"
+        : ([ext isEqualToString:@"ipa"] ? @"🔐"
+        : ([ext isEqualToString:@"zip"] ? @"🗜"
+        : ([ext isEqualToString:@"dylib"] ? @"🧩" : @"📄")));
+
+    // dosyaysa içindekileri ANA klasörde aç; klasörse kendisinde
+    NSString *browseDir = isDir ? path : [path stringByDeletingLastPathComponent];
+
+    UIView *card = [[DDPanelCardView alloc] init];
+    card.backgroundColor = DDPanelCard();
+    card.layer.cornerRadius = 18;
+
+    UIStackView *stack = [[UIStackView alloc] init];
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.spacing = 6;
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [card addSubview:stack];
+    [NSLayoutConstraint activateConstraints:@[
+      [stack.topAnchor constraintEqualToAnchor:card.topAnchor constant:18],
+      [stack.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:18],
+      [stack.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-18],
+      [stack.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-14],
+    ]];
+
+    UILabel *tl = [[UILabel alloc] init];
+    tl.text = title;
+    tl.textColor = [UIColor colorWithRed:0.35 green:0.9 blue:0.55 alpha:1.0];
+    tl.font = [UIFont boldSystemFontOfSize:15];
+    tl.textAlignment = NSTextAlignmentCenter;
+    [stack addArrangedSubview:tl];
+
+    UILabel *nameL = [[UILabel alloc] init];
+    nameL.text = [NSString stringWithFormat:@"%@  %@", icon, path.lastPathComponent];
+    nameL.textColor = DDPanelText();
+    nameL.font = [UIFont boldSystemFontOfSize:15];
+    nameL.textAlignment = NSTextAlignmentCenter;
+    nameL.numberOfLines = 2;
+    [stack addArrangedSubview:nameL];
+
+    UILabel *sizeL = [[UILabel alloc] init];
+    sizeL.text = exists ? [NSString stringWithFormat:@"%@%@",
+                            [DDCore humanSize:size],
+                            isDir ? @" • klasör" : @""]
+                        : @"⚠️ dosya bulunamadı";
+    sizeL.textColor = DDPanelSub();
+    sizeL.font = [UIFont boldSystemFontOfSize:13];
+    sizeL.textAlignment = NSTextAlignmentCenter;
+    [stack addArrangedSubview:sizeL];
+
+    UILabel *pathL = [[UILabel alloc] init];
+    pathL.text = path;
+    pathL.textColor = DDPanelSub();
+    pathL.font = [UIFont fontWithName:@"Menlo" size:9] ?: [UIFont systemFontOfSize:9];
+    pathL.textAlignment = NSTextAlignmentCenter;
+    pathL.numberOfLines = 3;
+    [stack addArrangedSubview:pathL];
+
+    UIView *divider = [[UIView alloc] init];
+    divider.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
+    divider.translatesAutoresizingMaskIntoConstraints = NO;
+    [stack addArrangedSubview:divider];
+    [stack setCustomSpacing:10 afterView:divider];
+    [NSLayoutConstraint activateConstraints:@[
+      [divider.heightAnchor constraintEqualToConstant:1],
+    ]];
+
+    UIButton *shareBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [shareBtn setTitle:@"📤  Paylaş / Dosyalara Kaydet" forState:UIControlStateNormal];
+    [shareBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    shareBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    shareBtn.backgroundColor = DDPanelAccent();
+    shareBtn.layer.cornerRadius = 12;
+    [shareBtn.heightAnchor constraintEqualToConstant:46].active = YES;
+    [stack addArrangedSubview:shareBtn];
+
+    UIButton *openBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [openBtn setTitle:@"📂  İçindekileri Aç (tarayıcı)" forState:UIControlStateNormal];
+    [openBtn setTitleColor:DDPanelAccent() forState:UIControlStateNormal];
+    openBtn.titleLabel.font = [UIFont boldSystemFontOfSize:15];
+    [openBtn.heightAnchor constraintEqualToConstant:44].active = YES;
+    [stack addArrangedSubview:openBtn];
+
+    UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [closeBtn setTitle:@"Kapat" forState:UIControlStateNormal];
+    [closeBtn setTitleColor:DDPanelSub() forState:UIControlStateNormal];
+    closeBtn.titleLabel.font = [UIFont boldSystemFontOfSize:14];
+    [closeBtn.heightAnchor constraintEqualToConstant:40].active = YES;
+    [stack addArrangedSubview:closeBtn];
+
+    // eylemler
+    void (^doShare)(void) = ^{
+      DDShareURL([NSURL fileURLWithPath:path]);
+    };
+    void (^doBrowse)(void) ^{
+      DDBrowserVC *vc = [[DDBrowserVC alloc] initWithPath:browseDir];
+      UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+      if (@available(iOS 13.0, *)) {
+        nav.modalPresentationStyle = UIModalPresentationPageSheet;
+      }
+      [DDOverlayRoot panelWillAppear];
+      [DDTopMostVC() presentViewController:nav animated:YES completion:nil];
+    };
+
+    [shareBtn addTarget:[DDPanelActions shared] action:@selector(buttonTapped:)
+                          forControlEvents:UIControlEventTouchUpInside];
+    shareBtn.tag = 1000;
+    [openBtn addTarget:[DDPanelActions shared] action:@selector(buttonTapped:)
+                        forControlEvents:UIControlEventTouchUpInside];
+    openBtn.tag = 1001;
+    [closeBtn addTarget:[DDPanelActions shared] action:@selector(buttonTapped:)
+                         forControlEvents:UIControlEventTouchUpInside];
+    closeBtn.tag = 1002;
+
+    [DDPanelActions shared].currentHandler = ^(NSInteger idx) {
+      dd_dismiss_card(card, ^{
+        if (idx == 0) doShare();
+        else if (idx == 1) doBrowse();
+      });
+    };
+
+    dd_present_card(card, nil);
   });
 }
 

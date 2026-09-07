@@ -205,13 +205,31 @@ static NSArray *DDDBColumns(sqlite3 *db, NSString *table) {
     DD_GUARD_CURRENT_BLOCK;
     sqlite3 *db = NULL;
     NSMutableArray *tables = [NSMutableArray array];
+    NSString *openErr = nil;
     if (sqlite3_open_v2(path.UTF8String, &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
       tables = [DDDBTables(db) mutableCopy];
+      if (tables.count == 0) {
+        const char *e = sqlite3_errmsg(db);
+        NSString *em = e ? [NSString stringWithUTF8String:e] : @"?";
+        openErr = [NSString stringWithFormat:
+            @"Tablo listesi boş.\nSebep: %@\n\nVeritabanı şifreli (SQLCipher) veya "
+            @"hasarlı olabilir.", em];
+      }
       sqlite3_close(db);
+    } else {
+      const char *e = sqlite3_errmsg(db);
+      openErr = [NSString stringWithFormat:@"Açılamadı: %@",
+                                         e ? [NSString stringWithUTF8String:e] : @"?"];
+      if (db) sqlite3_close(db);
     }
+    NSString *errCopy = openErr;
     dispatch_async(dispatch_get_main_queue(), ^{
       self.tables = tables;
+      self.navigationItem.rightBarButtonItem.enabled = tables.count > 0 || !errCopy;
       [self.table reloadData];
+      if (errCopy) {
+        DDAlert(@"Veritabanı", errCopy);
+      }
     });
   });
 }
@@ -344,7 +362,8 @@ static NSArray *DDDBColumns(sqlite3 *db, NSString *table) {
     NSFileManager *fm = [[NSFileManager alloc] init];
     NSMutableArray *found = [NSMutableArray array];
     NSSet *exts = [NSSet setWithArray:@[@"sqlite", @"db", @"db3", @"sqlitedb"]];
-    for (NSString *root in @[[DDCore homePath], [DDCore capturedPath]]) {
+    // Bundle DA taranır (oyunların veritabanları çoğunlukla bundle'dadır)
+    for (NSString *root in @[[DDCore bundlePath], [DDCore homePath], [DDCore capturedPath]]) {
       NSDirectoryEnumerator *e = [fm enumeratorAtPath:root];
       NSString *rel;
       while ((rel = [e nextObject])) {
@@ -362,7 +381,7 @@ static NSArray *DDDBColumns(sqlite3 *db, NSString *table) {
           }
         }
         if (isDB) [found addObject:[root stringByAppendingPathComponent:rel]];
-        if (found.count >= 300) break;
+        if (found.count >= 500) break;
       }
     }
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -377,8 +396,15 @@ static NSArray *DDDBColumns(sqlite3 *db, NSString *table) {
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-  return self.paths.count ? nil
-      : @"Veritabanı bulunamadı. Oyun bir DB açtıysa 'Yakalananlar' içinde olabilir.";
+  return self.paths.count
+      ? [NSString stringWithFormat:@"%lu veritabanı bulundu (bundle + sandbox + yakalananlar). "
+                                 @"🔒 işaretli olanlar şifreli olabilir (SQLCipher).",
+                                 (unsigned long)self.paths.count]
+      : @"Veritabanı bulunamadı.\n\nİpuçları:\n"
+        @"• Dosya tarayıcıda bir .sqlite/.db dosyasına basılı tutup "
+        @"'Veritabanı olarak aç' seçebilirsiniz\n"
+        @"• Uzantısız dosyalar magic baytından tanınır\n"
+        @"• Şifreli (SQLCipher) veritabanları açılamaz";
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {

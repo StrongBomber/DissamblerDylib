@@ -35,19 +35,23 @@ static uint32_t dd_dos_date(NSDate *date) {
 
 // 1 MB'lık parçalarla dosyayı okur, CRC hesaplar ve veriyi arşive yazar.
 static BOOL dd_stream_file(NSFileHandle *src, uint64_t size, NSFileHandle *dst, uint32_t *outCrc) {
-  uint32_t crc = 0;
-  uint64_t remaining = size;
-  const uint64_t chunk = 1024 * 1024;
-  while (remaining > 0) {
-    uint64_t n = MIN(remaining, chunk);
-    NSData *d = [src readDataOfLength:(NSUInteger)n];
-    if (d.length == 0) return NO; // dosya okuma hatası
-    crc = (uint32_t)crc32(crc, (const Bytef *)d.bytes, (uInt)d.length);
-    [dst writeData:d];
-    remaining -= d.length;
+  @try {
+    uint32_t crc = 0;
+    uint64_t remaining = size;
+    const uint64_t chunk = 1024 * 1024;
+    while (remaining > 0) {
+      uint64_t n = MIN(remaining, chunk);
+      NSData *d = [src readDataOfLength:(NSUInteger)n];
+      if (d.length == 0) return NO; // dosya okuma hatası
+      crc = (uint32_t)crc32(crc, (const Bytef *)d.bytes, (uInt)d.length);
+      [dst writeData:d];
+      remaining -= d.length;
+    }
+    *outCrc = crc;
+    return YES;
+  } @catch (NSException *e) {
+    return NO; // disk dolu / yazma hatası → çökme yok, ZIP temiz şekilde başarısız
   }
-  *outCrc = crc;
-  return YES;
 }
 
 #pragma mark - Girdi kaydı

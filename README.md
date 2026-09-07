@@ -9,6 +9,18 @@ CydiaSubstrate / ElleKit **gerekmez** — hook'lar [fishhook](https://github.com
 
 ---
 
+## 🛠 v2.2 — "oyuna dokunulamıyor / DB / çıktı görünmüyor" çözüldü
+
+| Sorun | Kök neden | Çözüm |
+|---|---|---|
+| **Oyuna dokunulamıyordu** | Overlay penceremiz tüm ekranı kaplıyor ve **tüm dokunuşları yutuyordu** | `DDPassthroughWindow`: yalnız buton/panel/hud'ın kendisi dokunuş yakalar; **boş alanlar oyuna geçer** — oyun oynanmaya devam eder |
+| **Klavye oyunu bozuyordu** | Panel kapandıktan sonra penceremiz key kalıyordu | Panel kapanınca oyunun key penceresi geri verilir |
+| **SQL/DB kontrol edilemiyordu** | DB tarayıcı **bundle'ı taramıyordu** (oyun DB'leri çoğunlukla bundle'da!) | Bundle + sandbox + yakalananlar taranır; şifreli (SQLCipher) DB'lerde net uyarı |
+| **Her şey hex görünüyordu** | Önizleme SQLite/plist ayrımı yapmıyordu | Önizlemede **Otomatik / Metin / Hex mod seçici**; SQLite dosyaları tablo listesiyle açılır, 🗃 düğmesi DB tarayıcıya götürür |
+| **Dump sonrası ZIP/IPA ortada yoktu** | Share sheet, menü açıkken sunulmaya çalışılıp **sessizce başarısız** oluyordu | Yeni **Sonuç Panosu**: dump bitince çıktı EKRANDA gösterilir → 📤 Paylaş/Dosyalara Kaydet, 📂 İçindekileri Aç |
+| **Çıktılara sonra erişilemiyordu** | Menüde kısayol yoktu | Menüde **📦 Dump Çıktıları** satırı: tüm ZIP/IPA/klasörler tek listede |
+| Disk dolunca çökme riski | NSFileHandle istisnası | ZIP akışı `@try` korumalı — çökme yerine temiz hata |
+
 ## 🚑 v2.1 — "dump edilemiyor / lag / UI" kökten çözüldü
 
 | Sorun | Kök neden | Çözüm |

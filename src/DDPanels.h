@@ -51,6 +51,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+#pragma mark - Sonuç panosu (dump çıktısı gösterimi)
+
+/// Dump/ZIP/IPA tamamlandığında çıktıyı EKRANDA gösterir:
+/// ad, boyut, yol + [📤 Paylaş & Dosyalara Kaydet] [📂 İçindekileri Aç] [Kapat]
+/// path bir dosya ise klasörü, klasörse kendisi açılır (dosya tarayıcıyla).
+void DDResultPanel(NSString *title, NSString *path);
+
 #pragma mark - Onay panosu (butonlu)
 
 /// Karanlık temalı onay kartı. buttons: başlık dizisi.

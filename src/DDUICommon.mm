@@ -24,8 +24,12 @@ UIFont *DDMonoFont(CGFloat size) {
 }
 
 UIViewController *DDTopMostVC(void) {
-  // Yalnızca sunum yapabileceğimiz kendi root'umuz
-  return [DDOverlayRoot rootVC];
+  // Kendi pencere kökümüzden sunum zincirinde en üste yürü.
+  // (Menü pageSheet açıkken root'tan sunum YAPILAMAZ — sessizce başarısız olurdu;
+  //  bu yüzden en üstteki sunulmuş denetleyiciyi döndürüyoruz)
+  UIViewController *vc = [DDOverlayRoot rootVC];
+  while (vc.presentedViewController) vc = vc.presentedViewController;
+  return vc;
 }
 
 #pragma mark - Uyarı / bilgi

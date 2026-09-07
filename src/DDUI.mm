@@ -18,24 +18,26 @@
 #import "DDSmartDump.h"
 #import "DDOverride.h"
 
+#import <sqlite3.h>
+
 #include <string.h>
 
-#pragma mark - DDBrowserEntry
-
-@interface DDBrowserEntry : NSObject
-@property (nonatomic, copy) NSString *name;
-@property (nonatomic, copy) NSString *path;
-@property (nonatomic) BOOL isDir;
-@property (nonatomic) unsigned long long size;
-@property (nonatomic, strong, nullable) NSDate *modified;
-@end
+#pragma mark - DDBrowserEntry (arayüz DDFeatures.h'ta)
 
 @implementation DDBrowserEntry
 @end
 
 #pragma mark - DDPreviewVC
 
-@implementation DDPreviewVC
+@implementation DDPreviewVC {
+  NSInteger _mode;              // 0=Otomatik 1=Metin 2=Hex
+  NSData *_loadedData;
+  NSString *_loadedText;        // metin olarak çözüldüyse
+  BOOL _isSqlite;
+  NSArray<NSString *> *_sqliteTables;
+  BOOL _isImage;
+  UIImage *_decodedImage;
+}
 
 - (instancetype)initWithFile:(NSString *)path {
   self = [super init];
@@ -47,19 +49,32 @@
   [super viewDidLoad];
   self.view.backgroundColor = [UIColor whiteColor];
   self.title = self.filePath.lastPathComponent;
+  _mode = 0;
+
+  // Mod seçici (başlıkta)
+  UISegmentedControl *seg = [[UISegmentedControl alloc]
+      initWithItems:@[@"Otomatik", @"Metin", @"Hex"]];
+  seg.selectedSegmentIndex = 0;
+  [seg addTarget:self action:@selector(modeChanged:)
+        forControlEvents:UIControlEventValueChanged];
+  seg.frame = CGRectMake(0, 0, 180, 30);
+  self.navigationItem.titleView = seg;
 
   UIBarButtonItem *share = [[UIBarButtonItem alloc]
       initWithBarButtonSystemItem:UIBarButtonSystemItemAction target:self action:@selector(shareSelf)];
+  UIBarButtonItem *dbBtn = [[UIBarButtonItem alloc]
+      initWithTitle:@"🗃" style:UIBarButtonItemStylePlain target:self action:@selector(openDB:)];
   UIBarButtonItem *analyze = [[UIBarButtonItem alloc]
       initWithTitle:@"🧠" style:UIBarButtonItemStylePlain target:self action:@selector(analyzeSelf)];
   UIBarButtonItem *edit = [[UIBarButtonItem alloc]
       initWithTitle:@"✏️" style:UIBarButtonItemStylePlain target:self action:@selector(editSelf)];
-  self.navigationItem.rightBarButtonItems = @[share, analyze, edit];
+  self.navigationItem.rightBarButtonItems = @[share, dbBtn, analyze, edit];
 
-  // Canlı düzenleme aktifse oyunun gördüğü sürümü göster + banner
+  // Override banner
   NSString *ov = [DDOverride effectivePathFor:self.filePath];
   if (ov) {
     self.effectivePath = ov;
+    self.contentTop = 24;
     UILabel *banner = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 24)];
     banner.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     banner.backgroundColor = [UIColor colorWithRed:0.93 green:0.45 blue:0.05 alpha:1.0];
@@ -68,38 +83,97 @@
     banner.textAlignment = NSTextAlignmentCenter;
     banner.text = @" ✏️ CANLI OVERRIDE AKTİF — oyun bu içeriği okuyor";
     [self.view addSubview:banner];
-    [self.view bringSubviewToFront:banner];
-    self.contentTop = 24;
   }
 
-  // Çok büyük dosyaları belleğe yükleme — kullanıcı paylaşarak alsın
-  NSDictionary *attrs = [[NSFileManager defaultManager]
-      attributesOfItemAtPath:(self.effectivePath ?: self.filePath) error:nil];
-  unsigned long long size = [attrs fileSize];
-  if (size > 64ull * 1024 * 1024) {
-    UITextView *tv = [[UITextView alloc] initWithFrame:
-        CGRectMake(0, self.contentTop, self.view.bounds.size.width,
-                   self.view.bounds.size.height - self.contentTop)];
-    tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    tv.editable = NO;
-    tv.font = DDMonoFont(13);
-    tv.text = [NSString stringWithFormat:
-        @"⚠️ Dosya çok büyük (%@).\n\n"
-        @"Belleği korumak için önizleme devre dışı.\n"
-        @"Sağ üstteki paylaş (⬆️) düğmesiyle dosyayı\n"
-        @"Dosyalar uygulamasına kaydedebilirsiniz.",
-        [DDCore humanSize:size]];
-    [self.view addSubview:tv];
-    return;
+  [self loadAsync];
+}
+
+- (void)modeChanged:(UISegmentedControl *)seg {
+  _mode = seg.selectedSegmentIndex;
+  [self render];
+}
+
+- (void)loadAsync {
+  __weak typeof(self) ws = self;
+  NSString *path = self.effectivePath ?: self.filePath;
+  dispatch_async([DDCore ioQueue], ^{
+    DD_GUARD_CURRENT_BLOCK;
+    NSData *data = [NSData dataWithContentsOfFile:path];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      ws->_loadedData = data;
+      if (!data) {
+        [ws showMessage:@"⚠️ Dosya okunamadı.\n\nDosya taşınmış/silinmiş ya da erişim engellenmiş olabilir."];
+        return;
+      }
+      // büyük dosya koruması
+      if (data.length > 64ull * 1024 * 1024) {
+        [ws showMessage:[NSString stringWithFormat:
+            @"⚠️ Dosya çok büyük (%@).\n\nBelleği korumak için önizleme devre dışı.\n"
+             @"Sağ üstteki ⬆️ ile paylaşabilir, 🧠 ile analiz edebilirsiniz.",
+            [DDCore humanSize:data.length]]];
+        return;
+      }
+
+      // SQLite?
+      ws->_isSqlite = (data.length >= 15 &&
+                       memcmp(data.bytes, "SQLite format 3", 15) == 0);
+      if (ws->_isSqlite) {
+        [ws probeSqlite];
+      }
+
+      // Görsel?
+      NSString *lower = ws.filePath.pathExtension.lowercaseString;
+      if ([DDCore isImageExtension:lower]) {
+        ws->_decodedImage = [UIImage imageWithData:data];
+      }
+      ws->_isImage = (ws->_decodedImage != nil);
+
+      // Metin?
+      ws->_loadedText = [ws decodeText:data];
+      [ws render];
+    });
+  });
+}
+
+- (nullable NSString *)decodeText:(NSData *)data {
+  if (data.length >= 8 && memcmp(data.bytes, "bplist00", 8) == 0) {
+    id pl = [NSPropertyListSerialization propertyListWithData:data
+                                                      options:NSPropertyListImmutable
+                                                       format:nil error:nil];
+    if (pl) return [NSString stringWithFormat:@"— Property List (binary) —\n\n%@", pl];
   }
+  // XML plist ve JSON zaten UTF-8 metin
+  NSString *s = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+  if (!s) s = [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding];
+  return s;
+}
 
-  NSString *ext = self.filePath.pathExtension;
-  NSString *lower = ext.lowercaseString;
+- (void)probeSqlite {
+  sqlite3 *db = NULL;
+  NSMutableArray *tables = [NSMutableArray array];
+  if (sqlite3_open_v2((self.effectivePath ?: self.filePath).UTF8String,
+                      &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK) {
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(db, "SELECT name FROM sqlite_master WHERE type='table' "
+                               "ORDER BY name", -1, &st, NULL) == SQLITE_OK) {
+      while (sqlite3_step(st) == SQLITE_ROW) {
+        const unsigned char *n = sqlite3_column_text(st, 0);
+        if (n) [tables addObject:[NSString stringWithUTF8String:(const char *)n]];
+      }
+    }
+    if (st) sqlite3_finalize(st);
+  }
+  if (db) sqlite3_close(db);
+  _sqliteTables = tables;
+}
 
-  if ([DDCore isImageExtension:lower]) {
-    [self showImage];
+- (void)openDB:(id)sender {
+  if (_isSqlite) {
+    DDDBBrowserVC *vc = [[DDDBBrowserVC alloc]
+        initWithDBPath:(self.effectivePath ?: self.filePath)];
+    [self.navigationController pushViewController:vc animated:YES];
   } else {
-    [self showTextOrHex];
+    DDToast(@"Bu dosya SQLite değil (🔒 şifreli/bozuk da olabilir)");
   }
 }
 
@@ -117,147 +191,137 @@
   [self.navigationController pushViewController:vc animated:YES];
 }
 
-- (void)showImage {
-  __weak typeof(self) ws = self;
-  dispatch_async([DDCore ioQueue], ^{
-    DD_GUARD_CURRENT_BLOCK;
-    UIImage *img = [UIImage imageWithContentsOfFile:(ws.effectivePath ?: ws.filePath)];
-    dispatch_async(dispatch_get_main_queue(), ^{
-      if (!img) {
-        [ws showTextOrHex];
-        return;
+- (void)showMessage:(NSString *)msg {
+  UITextView *tv = [[UITextView alloc] initWithFrame:
+      CGRectMake(0, self.contentTop, self.view.bounds.size.width,
+                 self.view.bounds.size.height - self.contentTop)];
+  tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  tv.editable = NO;
+  tv.font = DDMonoFont(13);
+  tv.text = msg;
+  [self.view addSubview:tv];
+}
+
+- (void)render {
+  // önceki içerik view'larını temizle (banner hariç — banner en altta kalmalı)
+  for (UIView *v in self.view.subviews) {
+    if (v != self.zoomScroll) [v removeFromSuperview];
+  }
+  self.zoomScroll = nil;
+  self.zoomImage = nil;
+
+  NSData *data = _loadedData;
+  if (!data) return;
+
+  // ── Otomatik mod ──
+  if (_mode == 0) {
+    if (_isSqlite) {
+      NSMutableString *s = [NSMutableString stringWithFormat:
+          @"🗃 SQLITE VERİTABANI\n\nTablo sayısı: %lu\n\n", (unsigned long)_sqliteTables.count];
+      if (_sqliteTables.count == 0) {
+        [s appendString:@"⚠️ Tablo listelenemedi — veritabanı şifreli (SQLCipher) "
+                       @"veya bozuk olabilir.\n"];
+      } else {
+        [s appendString:@"TABLOLAR (adlarına dokununca 🗃 düğmesiyle tam tarayıcı açılır):\n\n"];
+        for (NSString *t in _sqliteTables) [s appendFormat:@"  • %@\n", t];
+        [s appendFormat:@"\n\nSağ üstteki 🗑 değil 🗃 düğmesi (Veritabanı) tam SQL tarayıcıyı açar.\n"
+                       @"Satırları gezmek, SQL çalıştırmak için kullanın."];
       }
-      UIScrollView *sv = [[UIScrollView alloc] initWithFrame:
-          CGRectMake(0, ws.contentTop, ws.view.bounds.size.width,
-                     ws.view.bounds.size.height - ws.contentTop)];
-      sv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-      sv.minimumZoomScale = 0.3;
-      sv.maximumZoomScale = 8.0;
-      sv.delegate = ws;
-      UIImageView *iv = [[UIImageView alloc] initWithImage:img];
-      iv.frame = (CGRect){CGPointZero, img.size};
-      iv.contentMode = UIViewContentModeScaleAspectFit;
-      [sv addSubview:iv];
-      sv.contentSize = img.size;
-      [ws.view addSubview:sv];
-      ws.zoomScroll = sv;
-      ws.zoomImage = iv;
-    });
-  });
+      [self showText:s];
+      return;
+    }
+    if (_isImage) {
+      [self showImageNow];
+      return;
+    }
+    if (_loadedText) {
+      [self showText:_loadedText];
+      return;
+    }
+    [self showHex];
+    return;
+  }
+
+  // ── Metin modu ──
+  if (_mode == 1) {
+    if (_loadedText) [self showText:_loadedText];
+    else [self showText:@"⚠️ Bu dosya metin olarak çözümlenemedi (ikili içerik).\n"
+                      @"Hex moduna geçin ya da 🧠 Analiz'i kullanın."];
+    return;
+  }
+
+  // ── Hex modu ──
+  [self showHex];
+}
+
+- (void)showText:(NSString *)text {
+  if (text.length > 1000000) {
+    text = [[text substringToIndex:1000000]
+        stringByAppendingString:@"\n\n… (1 MB sınırı — tamamı için ⬆️ paylaş)"];
+  }
+  UITextView *tv = [[UITextView alloc] initWithFrame:
+      CGRectMake(0, self.contentTop, self.view.bounds.size.width,
+                 self.view.bounds.size.height - self.contentTop)];
+  tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  tv.editable = NO;
+  tv.font = DDMonoFont(12);
+  tv.backgroundColor = [UIColor whiteColor];
+  tv.textColor = [UIColor blackColor];
+  tv.alwaysBounceVertical = YES;
+  tv.text = text;
+  [self.view addSubview:tv];
+}
+
+- (void)showImageNow {
+  UIScrollView *sv = [[UIScrollView alloc] initWithFrame:
+      CGRectMake(0, self.contentTop, self.view.bounds.size.width,
+                 self.view.bounds.size.height - self.contentTop)];
+  sv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  sv.minimumZoomScale = 0.3;
+  sv.maximumZoomScale = 8.0;
+  sv.delegate = self;
+  UIImageView *iv = [[UIImageView alloc] initWithImage:_decodedImage];
+  iv.frame = (CGRect){CGPointZero, _decodedImage.size};
+  iv.contentMode = UIViewContentModeScaleAspectFit;
+  [sv addSubview:iv];
+  sv.contentSize = _decodedImage.size;
+  [self.view addSubview:sv];
+  self.zoomScroll = sv;
+  self.zoomImage = iv;
 }
 
 - (UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView {
   return self.zoomImage;
 }
 
-- (void)showTextOrHex {
-  __weak typeof(self) ws = self;
-  dispatch_async([DDCore ioQueue], ^{
-    DD_GUARD_CURRENT_BLOCK;
-    NSData *data = [NSData dataWithContentsOfFile:(ws.effectivePath ?: ws.filePath)];
-    dispatch_async(dispatch_get_main_queue(), ^{
-      if (!data) {
-        UITextView *tv = [[UITextView alloc] initWithFrame:
-            CGRectMake(0, ws.contentTop, ws.view.bounds.size.width,
-                       ws.view.bounds.size.height - ws.contentTop)];
-        tv.text = @"Dosya okunamadı.";
-        tv.editable = NO;
-        [ws.view addSubview:tv];
-        return;
-      }
-
-      NSString *text = nil;
-
-      // Binary plist?
-      if (data.length >= 8 && memcmp(data.bytes, "bplist00", 8) == 0) {
-        id pl = [NSPropertyListSerialization propertyListWithData:data
-                                                          options:NSPropertyListImmutable
-                                                           format:nil
-                                                            error:nil];
-        if (pl) text = [NSString stringWithFormat:@"— Property List (binary) —\n\n%@", pl];
-      }
-      // Metin?
-      if (!text) {
-        NSString *ext = ws.filePath.pathExtension.lowercaseString;
-        BOOL sniffText = NO;
-        if ([DDCore isTextExtension:ext]) {
-          sniffText = YES;
-        } else {
-          const uint8_t *b = (const uint8_t *)data.bytes;
-          NSUInteger probe = MIN(data.length, 4096);
-          sniffText = YES;
-          for (NSUInteger i = 0; i < probe; i++) {
-            if (b[i] == 0) { sniffText = NO; break; }
-            if (b[i] < 9 && b[i] != 0) { sniffText = NO; break; }
-          }
-        }
-        if (sniffText) {
-          NSString *s = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-          if (!s) s = [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding];
-          if (s) {
-            if (s.length > 1000000) {
-              s = [[s substringToIndex:1000000]
-                   stringByAppendingString:@"\n\n… (1 MB ile sınırlandırıldı, tamamı için paylaş)"];
-            }
-            text = s;
-          }
-        }
-      }
-
-      UITextView *tv = [[UITextView alloc] initWithFrame:
-          CGRectMake(0, ws.contentTop, ws.view.bounds.size.width,
-                     ws.view.bounds.size.height - ws.contentTop)];
-      tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-      tv.editable = NO;
-      tv.font = DDMonoFont(12);
-      tv.backgroundColor = [UIColor whiteColor];
-      tv.textColor = [UIColor blackColor];
-      tv.alwaysBounceVertical = YES;
-
-      if (text) {
-        tv.text = text;
-      } else {
-        // Hex dump (ilk 64 KB)
-        const uint8_t *b = (const uint8_t *)data.bytes;
-        NSUInteger n = MIN(data.length, 65536);
-        NSMutableString *hex = [NSMutableString stringWithFormat:
-            @"— HEX görünümü (ilk %@ / %@) —\n\n",
-            [DDCore humanSize:n], [DDCore humanSize:data.length]];
-        for (NSUInteger off = 0; off < n; off += 16) {
-          NSUInteger lineLen = MIN(16, n - off);
-          [hex appendFormat:@"%08lX  ", (unsigned long)off];
-          for (NSUInteger i = 0; i < 16; i++) {
-            if (i < lineLen) [hex appendFormat:@"%02X ", b[off + i]];
-            else [hex appendString:@"   "];
-            if (i == 7) [hex appendString:@" "];
-          }
-          [hex appendString:@" |"];
-          for (NSUInteger i = 0; i < lineLen; i++) {
-            uint8_t c = b[off + i];
-            [hex appendFormat:@"%c", (c >= 32 && c < 127) ? c : '.'];
-          }
-          [hex appendString:@"|\n"];
-        }
-        tv.text = hex;
-      }
-      [ws.view addSubview:tv];
-    });
-  });
+- (void)showHex {
+  NSData *data = _loadedData;
+  const uint8_t *b = (const uint8_t *)data.bytes;
+  NSUInteger n = MIN(data.length, 128 * 1024);  // 128 KB hex görünümü
+  NSMutableString *hex = [NSMutableString stringWithFormat:
+      @"— HEX görünümü (ilk %@ / %@) —\n\n",
+      [DDCore humanSize:n], [DDCore humanSize:data.length]];
+  for (NSUInteger off = 0; off < n; off += 16) {
+    NSUInteger lineLen = MIN(16, n - off);
+    [hex appendFormat:@"%08lX  ", (unsigned long)off];
+    for (NSUInteger i = 0; i < 16; i++) {
+      if (i < lineLen) [hex appendFormat:@"%02X ", b[off + i]];
+      else [hex appendString:@"   "];
+      if (i == 7) [hex appendString:@" "];
+    }
+    [hex appendString:@" |"];
+    for (NSUInteger i = 0; i < lineLen; i++) {
+      uint8_t c = b[off + i];
+      [hex appendFormat:@"%c", (c >= 32 && c < 127) ? c : '.'];
+    }
+    [hex appendString:@"|\n"];
+  }
+  [self showText:hex];
 }
 
 @end
 
 #pragma mark - DDBrowserVC
-
-@interface DDBrowserVC : UIViewController <UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate>
-@property (nonatomic, copy) NSString *rootPath;
-@property (nonatomic, copy) NSString *currentPath;
-@property (nonatomic, strong) UITableView *table;
-@property (nonatomic, strong) UISearchBar *searchBar;
-@property (nonatomic, strong) NSArray<DDBrowserEntry *> *entries;
-@property (nonatomic, copy) NSString *filter;
-@property (nonatomic, strong, nullable) NSTimer *searchDebounce;
-@end
 
 @implementation DDBrowserVC
 
@@ -419,7 +483,7 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
   [DDDumpService zipDirectory:dir completion:^(NSString *zipPath, NSError *error) {
     DDHideProgress();
     if (zipPath) {
-      DDShareURL([NSURL fileURLWithPath:zipPath]);
+      DDResultPanel(@"🗜 ZIP hazır", zipPath);
     } else {
       DDAlert(@"ZIP", error.localizedDescription ?: @"Başarısız (4GB sınırı?)");
     }
@@ -740,7 +804,7 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
       DDHideProgress();
       if (out) {
         DDLog(@"🧩 İkili dump: %@", out);
-        DDShareURL([NSURL fileURLWithPath:out]);
+        DDResultPanel(@"🧩 İkili dump edildi", out);
       } else {
         DDAlert(@"Dump hatası", err.localizedDescription ?: @"Bilinmeyen hata");
       }
@@ -776,12 +840,12 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
       DDHideProgress();
       NSString *msg = [NSString stringWithFormat:@"%lu ikili dump edildi:\n%@", (unsigned long)n, dir];
       DDLog(@"📚 %@", msg);
-      DDConfirmPanel(@"Tamamlandı", msg, @[@"📤 ZIP olarak paylaş", @"Kapat"], -1, ^(NSInteger idx) {
+      DDConfirmPanel(@"Tamamlandı", msg, @[@"📤 ZIP'le ve göster", @"Kapat"], -1, ^(NSInteger idx) {
         if (idx == 0) {
           DDShowProgress(@"ZIP hazırlanıyor…");
           [DDDumpService zipDirectory:dir completion:^(NSString *zipPath, NSError *error) {
             DDHideProgress();
-            if (zipPath) DDShareURL([NSURL fileURLWithPath:zipPath]);
+            if (zipPath) DDResultPanel(@"🗜 ZIP hazır", zipPath);
             else DDAlert(@"ZIP", @"Başarısız");
           }];
         }
@@ -992,6 +1056,7 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
     @[
       @{@"icon": @"🔐", @"title": @"AKILLI DECRYPT & IPA", @"sub": @"Decrypted ikili + strings + class-dump + yeniden imzalanabilir IPA"},
       @{@"icon": @"💾", @"title": @"TAM DUMP", @"sub": @"Bundle + şifresi çözülmüş ikililer + raporlar → ZIP"},
+      @{@"icon": @"📦", @"title": @"Dump Çıktıları", @"sub": @"Üretilen ZIP/IPA/klasörler — buradan paylaş veya kaydet"},
     ],
     @[
       @{@"icon": @"⚙️", @"title": @"Ayarlar", @"sub": @"Yakalama, günlük, ağ, ZIP, IPA"},
@@ -1168,6 +1233,7 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
       switch (indexPath.row) {
         case 0: [self startSmartDump]; break;
         case 1: [self startFullDump]; break;
+        case 2: [self pushBrowser:[DDCore dumpsPath]]; break;
       }
       break;
     case 5:
@@ -1210,21 +1276,11 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
                        @"kurabilirsiniz — FairPlay şifresi kaldırılmıştır.)", ipaPath];
     }
     DDLog(@"🔐 Akıllı dump bitti: %@", ipaPath ?: dir);
-    DDConfirmPanel(@"Tamamlandı", msg,
-                   ipaPath ? @[@"📤 IPA'yı paylaş", @"📂 ZIP'le ve paylaş", @"Kapat"]
-                           : @[@"📂 ZIP'le ve paylaş", @"Kapat"],
-                   -1, ^(NSInteger idx) {
-      if (ipaPath && idx == 0) {
-        DDShareURL([NSURL fileURLWithPath:ipaPath]);
-      } else if ((ipaPath && idx == 1) || (!ipaPath && idx == 0)) {
-        DDShowProgress(@"ZIP hazırlanıyor…");
-        [DDDumpService zipDirectory:dir completion:^(NSString *zipPath, NSError *zerr) {
-          DDHideProgress();
-          if (zipPath) DDShareURL([NSURL fileURLWithPath:zipPath]);
-          else DDAlert(@"ZIP", zerr.localizedDescription ?: @"Başarısız");
-        }];
-      }
-    });
+    if (ipaPath) {
+      DDResultPanel(@"🔐 Decrypted IPA hazır", ipaPath);
+    } else {
+      DDResultPanel(@"🔐 Akıllı dump tamamlandı (klasör)", dir);
+    }
   }];
 }
 
@@ -1271,16 +1327,30 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
     }
     if (zipPath) {
       DDLog(@"✅ Tam dump ZIP hazır: %@", zipPath);
-      DDToast(@"Dump tamamlandı — paylaşım açılıyor");
-      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
-                     dispatch_get_main_queue(), ^{
-        DDShareURL([NSURL fileURLWithPath:zipPath]);
-      });
+      DDResultPanel(@"✅ Tam Dump hazır", zipPath);
     } else if (dumpDir) {
-      DDAlert(@"Tamamlandı (ZIP kapalı)",
-              [NSString stringWithFormat:@"Klasör hazır:\n%@", dumpDir]);
+      DDResultPanel(@"✅ Tam Dump hazır (klasör)", dumpDir);
     }
   }];
+}
+
+@end
+
+#pragma mark - Dokunma geçişli pencere (KRİTİK)
+
+/// Tüm ekranı kaplayan overlay penceremizin BOŞ alanlarına gelen dokunuşlar
+/// oyuna GEÇİRİLİR. Yalnız buton/panel/hud gibi gerçek subview'lar yakalar.
+/// Böylece oyun oynanmaya devam eder.
+@interface DDPassthroughWindow : UIWindow
+@end
+
+@implementation DDPassthroughWindow
+
+- (UIView *)hitTest:(CGPoint)point withEvent:(UIEvent *)event {
+  UIView *hit = [super hitTest:point withEvent:event];
+  // Root view'un kendisine denk gelen dokunuş = boş alan → oyuna bırak
+  if (hit == self.rootViewController.view) return nil;
+  return hit;
 }
 
 @end
@@ -1327,7 +1397,7 @@ static UIColor *DDMenuAcc(void)  { return [UIColor colorWithRed:0.11 green:0.51 
 - (void)setupWindow {
   if (self.window) return; // zaten kurulu
 
-  self.window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+  self.window = [[DDPassthroughWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
   self.window.windowLevel = UIWindowLevelStatusBar + 100.0;
   self.window.backgroundColor = [UIColor clearColor];
   UIViewController *root = [UIViewController new];
