@@ -43,11 +43,11 @@ if [ ! -f "$LUA_DIR/lua.h" ]; then
   if [ "$ok" != "1" ]; then echo "❌ Lua kaynakları indirilemedi (ağ gerekli)"; exit 1; fi
   rm -rf /tmp/lua_x && mkdir -p /tmp/lua_x
   tar -xzf /tmp/lua.tar.gz -C /tmp/lua_x
-  SRCDIR=$(ls -d /tmp/lua_x/*/ 2>/dev/null | head -1)
-  echo "  açılan: $SRCDIR"
-  if [ -z "$SRCDIR" ] || [ ! -f "${SRCDIR}lua.h" ]; then
-    echo "❌ lua.h bulunamadı (arşiv bozuk?)"; exit 1
-  fi
+  # lua.org arşivi src/ altında, GitHub arşivi kökte saklar → lua.h'ı bul
+  LUA_H=$(find /tmp/lua_x -name lua.h | head -1)
+  if [ -z "$LUA_H" ]; then echo "❌ lua.h bulunamadı (arşiv bozuk?)"; exit 1; fi
+  SRCDIR=$(dirname "$LUA_H")/
+  echo "  kaynak: $SRCDIR"
   mkdir -p "$LUA_DIR"
   cp "$SRCDIR"*.c "$SRCDIR"*.h "$LUA_DIR/"
   rm -f "$LUA_DIR/lua.c" "$LUA_DIR/luac.c" "$LUA_DIR/onelua.c"
