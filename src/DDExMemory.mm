@@ -184,6 +184,8 @@ static NSArray<NSNumber *> *DDMemScan(const void *pattern, NSUInteger patSize,
 }
 
 /// Adresten mevcut değeri oku
+static BOOL DDMemRead(uint64_t addr, void *out, NSUInteger size);
+
 /// Adresteki değeri double olarak oku (arıtma karşılaştırmaları için)
 static double DDMemReadValue(uint64_t addr, DDMemType t) {
   uint8_t buf[8];

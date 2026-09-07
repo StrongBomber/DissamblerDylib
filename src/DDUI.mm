@@ -595,7 +595,16 @@ trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath {
 
 @end
 
-#pragma mark - DDConsoleVC
+#pragma mark - DDConsoleVC (public arayüz DDFeatures.h'ta)
+
+@interface DDConsoleVC ()
+@property (nonatomic, strong) UITextView *tv;
+@property (nonatomic) NSUInteger lastSeen;
+@property (nonatomic, strong) NSTimer *timer;
+@property (nonatomic) BOOL paused;
+@property (nonatomic, strong) UISegmentedControl *filterSeg;
+@property (nonatomic, strong) NSMutableArray<NSString *> *backlog;
+@end
 
 @implementation DDConsoleVC
 
