@@ -100,14 +100,16 @@
     DD_GUARD_CURRENT_BLOCK;
     NSData *data = [NSData dataWithContentsOfFile:path];
     dispatch_async(dispatch_get_main_queue(), ^{
-      ws->_loadedData = data;
+      __strong typeof(ws) s = ws;
+      if (!s) return;
+      s->_loadedData = data;
       if (!data) {
-        [ws showMessage:@"⚠️ Dosya okunamadı.\n\nDosya taşınmış/silinmiş ya da erişim engellenmiş olabilir."];
+        [s showMessage:@"⚠️ Dosya okunamadı.\n\nDosya taşınmış/silinmiş ya da erişim engellenmiş olabilir."];
         return;
       }
       // büyük dosya koruması
       if (data.length > 64ull * 1024 * 1024) {
-        [ws showMessage:[NSString stringWithFormat:
+        [s showMessage:[NSString stringWithFormat:
             @"⚠️ Dosya çok büyük (%@).\n\nBelleği korumak için önizleme devre dışı.\n"
              @"Sağ üstteki ⬆️ ile paylaşabilir, 🧠 ile analiz edebilirsiniz.",
             [DDCore humanSize:data.length]]];
@@ -115,22 +117,22 @@
       }
 
       // SQLite?
-      ws->_isSqlite = (data.length >= 15 &&
-                       memcmp(data.bytes, "SQLite format 3", 15) == 0);
-      if (ws->_isSqlite) {
-        [ws probeSqlite];
+      s->_isSqlite = (data.length >= 15 &&
+                      memcmp(data.bytes, "SQLite format 3", 15) == 0);
+      if (s->_isSqlite) {
+        [s probeSqlite];
       }
 
       // Görsel?
-      NSString *lower = ws.filePath.pathExtension.lowercaseString;
+      NSString *lower = s.filePath.pathExtension.lowercaseString;
       if ([DDCore isImageExtension:lower]) {
-        ws->_decodedImage = [UIImage imageWithData:data];
+        s->_decodedImage = [UIImage imageWithData:data];
       }
-      ws->_isImage = (ws->_decodedImage != nil);
+      s->_isImage = (s->_decodedImage != nil);
 
       // Metin?
-      ws->_loadedText = [ws decodeText:data];
-      [ws render];
+      s->_loadedText = [s decodeText:data];
+      [s render];
     });
   });
 }
@@ -322,6 +324,16 @@
 @end
 
 #pragma mark - DDBrowserVC
+
+@interface DDBrowserVC ()
+@property (nonatomic, copy) NSString *rootPath;
+@property (nonatomic, copy) NSString *currentPath;
+@property (nonatomic, strong) UITableView *table;
+@property (nonatomic, strong) UISearchBar *searchBar;
+@property (nonatomic, strong) NSArray<DDBrowserEntry *> *entries;
+@property (nonatomic, copy) NSString *filter;
+@property (nonatomic, strong, nullable) NSTimer *searchDebounce;
+@end
 
 @implementation DDBrowserVC
 

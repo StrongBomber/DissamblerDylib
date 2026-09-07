@@ -388,7 +388,7 @@ void DDResultPanel(NSString *title, NSString *path) {
     void (^doShare)(void) = ^{
       DDShareURL([NSURL fileURLWithPath:path]);
     };
-    void (^doBrowse)(void) ^{
+    void (^doBrowse)(void) = ^{
       DDBrowserVC *vc = [[DDBrowserVC alloc] initWithPath:browseDir];
       UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
       if (@available(iOS 13.0, *)) {
