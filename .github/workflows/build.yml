@@ -27,6 +27,13 @@ jobs:
           set -o pipefail
           ./build.sh 2>&1 | tee build.log
 
+      - name: Verify
+        run: |
+          file build/DDumper.dylib
+          otool -L build/DDumper.dylib
+          otool -l build/DDumper.dylib | grep -A2 LC_ENCRYPTION_INFO || true
+          codesign -dv build/DDumper.dylib 2>&1 | head -5
+
       # Sandbox agi Azure blob'u engelledigi icin loglar branch'e yazilir
       - name: Publish build log on failure
         if: failure()

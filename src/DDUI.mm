@@ -149,6 +149,25 @@ static void DDHideProgress(void) {
                                                     target:self
                                                     action:@selector(shareSelf)];
 
+  // Çok büyük dosyaları belleğe yükleme — kullanıcı paylaşarak alsın
+  NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:self.filePath
+                                                                          error:nil];
+  unsigned long long size = [attrs fileSize];
+  if (size > 64ull * 1024 * 1024) {
+    UITextView *tv = [[UITextView alloc] initWithFrame:self.view.bounds];
+    tv.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    tv.editable = NO;
+    tv.font = DDMonoFont(13);
+    tv.text = [NSString stringWithFormat:
+        @"⚠️ Dosya çok büyük (%@).\n\n"
+        @"Belleği korumak için önizleme devre dışı.\n"
+        @"Sağ üstteki paylaş (⬆️) düğmesiyle dosyayı\n"
+        @"Dosyalar uygulamasına kaydedebilirsiniz.",
+        [DDCore humanSize:size]];
+    [self.view addSubview:tv];
+    return;
+  }
+
   NSString *ext = self.filePath.pathExtension;
   NSString *lower = ext.lowercaseString;
 
