@@ -22,7 +22,8 @@ CydiaSubstrate / ElleKit **gerekmez** — hook'lar [fishhook](https://github.com
 | Süreç bilgisi | `gg.getTargetInfo()`, `gg.getSelectedPackage()`, `gg.copyText()` |
 | Dosya | `gg.getFileData`, `gg.saveFileData`, `gg.saveVariable` |
 | Uyumluluk | `gg.require`, `gg.VERSION_INT=10000` (GG 100.0 karşılığı), `os.exit` script'i bitirir (oyunu KİLITLEMEZ) |
-| Script yönetimi | Menü → **Lua Script (GameGuardian)**: scriptleri listele/çalıştır/düzenle/sil/paylaş. `.lua` dosyaları Dosyalar uygulamasından `DDumper/Scripts` klasörüne atılabilir. Herhangi bir `.lua`'ya tarayıcıda uzun basıp da çalıştırılabilir |
+| Script yönetimi | Menü → **Lua Script (GameGuardian)**: scriptleri listele/çalıştır/düzenle/sil/paylaş. Herhangi bir `.lua`'ya tarayıcıda uzun basıp da çalıştırılabilir |
+| **📥 İçe Aktar** | Script listesindeki 📥 düğmesi **Dosyalar/iCloud/Drive dosya seçiciyi** açar — seçilen `.lua`/`.txt` dosyaları (birden çok seçilebilir) Scripts klasörüne kopyalanır ve hemen çalıştırma önerilir. Aynı isim varsa otomatik `-2`, `-3`… son eki alır |
 | Canlı konsol | Script çalışırken her `print`/`gg.toast` satırı canlı akar; ⏹ İptal ile durdurulur |
 
 **Örnek** (GG'den kopyalanmış bir script olduğu gibi çalışır):

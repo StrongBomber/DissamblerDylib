@@ -1238,7 +1238,7 @@ static void dd_open_gg(lua_State *L) {
 
 #pragma mark - Script listesi ekranı
 
-@interface DDScriptsVC () <UITableViewDataSource, UITableViewDelegate>
+@interface DDScriptsVC () <UITableViewDataSource, UITableViewDelegate, UIDocumentPickerDelegate>
 @property (nonatomic, strong) UITableView *table;
 @property (nonatomic, strong) NSMutableArray<NSString *> *files;
 @end
@@ -1259,9 +1259,15 @@ static void dd_open_gg(lua_State *L) {
   self.table.separatorColor = [UIColor colorWithWhite:1 alpha:0.08];
   [self.view addSubview:self.table];
 
-  self.navigationItem.rightBarButtonItem =
+  UIBarButtonItem *newBtn =
       [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemAdd
                                                     target:self action:@selector(newScript)];
+  UIBarButtonItem *importBtn =
+      [[UIBarButtonItem alloc] initWithTitle:@"📥 İçe Aktar"
+                                       style:UIBarButtonItemStylePlain
+                                      target:self
+                                      action:@selector(importTapped)];
+  self.navigationItem.rightBarButtonItems = @[newBtn, importBtn];
 
   // açıklama kartı
   UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 84)];
@@ -1270,9 +1276,10 @@ static void dd_open_gg(lua_State *L) {
   hl.numberOfLines = 0;
   hl.font = [UIFont systemFontOfSize:11];
   hl.textColor = [UIColor colorWithWhite:0.6 alpha:1.0];
-  hl.text = @"GameGuardian scriptleri burada birebir çalışır. .lua dosyalarını "
-            @"Dosyalar uygulamasından DDumper/Scripts klasörüne atın "
-            @"(ya da + ile yeni yaratın). Satıra dokunun: Çalıştır / Düzenle / Paylaş.";
+  hl.text = @"GameGuardian scriptleri burada birebir çalışır.\n"
+            @"📥 İçe Aktar: Dosyalar'dan .lua seçip kopyalar\n"
+            @"＋ Yeni: telefonda sıfırdan yazarsınız\n"
+            @"Satıra dokunun: Çalıştır / Düzenle / Paylaş";
   [header addSubview:hl];
   self.table.tableHeaderView = header;
 }
@@ -1342,6 +1349,89 @@ static void dd_open_gg(lua_State *L) {
       DDToast(@"Silindi");
     }
   });
+}
+
+#pragma mark İçe aktar (dosya seçici)
+
+- (void)importTapped {
+  // Dosyalar / iCloud / Drive — .lua (ve .txt) seçilebilir
+  UIDocumentPickerViewController *picker =
+      [[UIDocumentPickerViewController alloc]
+          initWithDocumentTypes:@[@"public.plain-text", @"public.data"]
+                        inMode:UIDocumentPickerModeImport];
+  picker.allowsMultipleSelection = YES; // birden çok scripti tek seferde alın
+  picker.delegate = self;
+  [DDOverlayRoot panelWillAppear];
+  [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller
+didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+  [DDOverlayRoot panelDidDisappear];
+  NSFileManager *fm = [[NSFileManager alloc] init];
+  NSString *dir = [DDCore scriptsPath];
+  [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+
+  NSMutableArray<NSString *> *imported = [NSMutableArray array];
+  NSMutableArray<NSString *> *skipped = [NSMutableArray array];
+  for (NSURL *u in urls) {
+    NSString *name = u.lastPathComponent;
+    NSString *ext = name.pathExtension.lowercaseString;
+    if (![ext isEqualToString:@"lua"] && ![ext isEqualToString:@"txt"] &&
+        ![ext isEqualToString:@""]) {
+      [skipped addObject:name];
+      continue;
+    }
+    NSString *base = [name stringByDeletingPathExtension];
+    if (base.length == 0) base = @"script";
+    NSString *dest = [dir stringByAppendingPathComponent:
+                      [base stringByAppendingPathExtension:@"lua"]];
+    int i = 2;
+    while ([fm fileExistsAtPath:dest]) {
+      dest = [dir stringByAppendingPathComponent:
+              [NSString stringWithFormat:@"%@-%d.lua", base, i++]];
+    }
+    NSError *err = nil;
+    if ([fm copyItemAtPath:u.path toPath:dest error:&err]) {
+      [imported addObject:dest.lastPathComponent];
+      DDLog(@"📥 Script içe aktarıldı: %@", dest);
+    } else {
+      DDLog(@"⚠️ İçe aktarma hatası %@: %@", name, err.localizedDescription);
+      [skipped addObject:name];
+    }
+  }
+  [self reload];
+
+  if (imported.count == 0) {
+    DDAlert(@"İçe aktarma",
+            [NSString stringWithFormat:
+                @"Hiç dosya kopyalanamadı.\n\nYalnızca .lua (veya .txt) dosyaları "
+                @"içe aktarılabilir.%@",
+                skipped.count ? [NSString stringWithFormat:
+                    @"\n\nAtlanan: %@", [skipped componentsJoinedByString:@", "]] : @""]);
+    return;
+  }
+
+  DDToast([NSString stringWithFormat:@"📥 %lu script içe aktarıldı",
+           (unsigned long)imported.count]);
+
+  // İlkini hemen çalıştırmayı öner
+  NSString *firstPath = [dir stringByAppendingPathComponent:imported[0]];
+  __weak typeof(self) ws = self;
+  DDConfirmPanel(imported[0],
+      [NSString stringWithFormat:@"✅ %lu script içe aktarıldı.\n\n%@ şimdi çalıştırılsın mı?",
+       (unsigned long)imported.count, imported[0]],
+      @[@"▶️ Çalıştır", @"Kapat"], -1, ^(NSInteger idx) {
+    if (idx == 0) {
+      if ([DDScript running]) { DDToast(@"Başka bir script çalışıyor — bekleyin"); return; }
+      DDScriptConsoleVC *vc = [[DDScriptConsoleVC alloc] initWithScript:firstPath];
+      [ws.navigationController pushViewController:vc animated:YES];
+    }
+  });
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+  [DDOverlayRoot panelDidDisappear];
 }
 
 - (void)newScript {
